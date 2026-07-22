@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -24,7 +23,7 @@ model Outbox{
   aggregateType String 
   aggregateId String
   eventType String
-  payload String
+  payload Json
   published Boolean @default(false)
   createdAt DateTime @default(now())
 
