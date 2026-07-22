@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model User {
+  id String @id @default(uuid())
+  email String @unique
+  name String
+  password String
+  createdAt DateTime @default(now())
+
+  @@map("users")
+}
+
+model Outbox{
+
+  id String @id @default(uuid())
+  aggregateType String 
+  aggregateId String
+  eventType String
+  payload String
+  published Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("outbox")
+}
