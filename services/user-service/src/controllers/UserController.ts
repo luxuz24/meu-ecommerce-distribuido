@@ -1,14 +1,18 @@
 import { FastifyInstance,FastifyRequest, FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
-import { CreateUserUseCase } from "../useCases/CreateUserUseCase.js";
 import pg from 'pg';
 import { PrismaPg } from "@prisma/adapter-pg";
+//
+import { LoginUserUseCase } from "../useCases/LoginUseCase.js";
+import { CreateUserUseCase } from "../useCases/CreateUserUseCase.js";
+import { error } from "console";
 
 
 const pool = new pg.Pool({connectionString: process.env.DATABASE_URL});
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({adapter});
 const createUserUseCase = new CreateUserUseCase(prisma);
+const loginUserUseCase = new LoginUserUseCase(prisma);
 
 export async function userRoutes(app: FastifyInstance) {
   app.post(
@@ -53,5 +57,19 @@ export async function userRoutes(app: FastifyInstance) {
          
     }
   );
+
+  app.post('/login',async (request: FastifyRequest, reply: FastifyReply) => {
+    try{
+      const data = request.body as any;
+      const result = await loginUserUseCase.execute(data);
+      return reply.status(200).send(result);
+    }catch(error:any){
+      if(error.message === 'INVALID_CREDENTIALS!'){
+        return reply.status(401).send({error: 'INVALID_CREDENTIALS!'});
+      }
+    } console.error(error);
+    return reply.status(500).send({error: 'Internal Server Error'});
+
+  })
   
 }
