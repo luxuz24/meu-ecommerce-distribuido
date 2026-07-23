@@ -3,8 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import pg from 'pg';
 import { PrismaPg } from "@prisma/adapter-pg";
 //
-import { LoginUserUseCase } from "../useCases/LoginUseCase.js";
-import { CreateUserUseCase } from "../useCases/CreateUserUseCase.js";
+import { LoginUserUseCase } from "../../../use-cases/LoginUseCase.js";
+import { CreateUserUseCase } from "../../../use-cases/CreateUserUseCase.js";
+import { authMiddleware } from "../middlewares/AuthMiddleware.js";
 import { error } from "console";
 
 
@@ -70,6 +71,11 @@ export async function userRoutes(app: FastifyInstance) {
     } console.error(error);
     return reply.status(500).send({error: 'Internal Server Error'});
 
-  })
+  });
+
+  app.get('/users/me', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const userData = (request as any).user;
+    return reply.status(200).send({message: 'Authenticated user data', currentUser: userData});
+  });
   
 }

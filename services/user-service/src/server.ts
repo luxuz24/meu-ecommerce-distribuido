@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import Fastify from "fastify";
-import { userRoutes } from "./controllers/UserController.js";
+import { userRoutes } from "./infra/http/controllers/UserController.js";
 
 const app = Fastify({
     logger: true
