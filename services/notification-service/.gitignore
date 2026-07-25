@@ -1,0 +1,18 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+
+# Variáveis de Ambiente (NUNCA subir pro GitHub!)
+.env
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de IDE e SO
+.vscode/
+.DS_Store
