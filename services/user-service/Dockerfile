@@ -13,7 +13,7 @@ COPY . .
 
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /usr/src/app
 
