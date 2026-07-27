@@ -66,6 +66,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  user-outbox-processor:
+    build:
+      context: ./services/user-outbox-processor
+      dockerfile: Dockerfile
+    container_name: user-outbox-processor
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
+    networks:
+      - ecom_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started      
 
 networks:
   ecom_network:
