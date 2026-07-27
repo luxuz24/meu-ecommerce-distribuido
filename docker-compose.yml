@@ -4,9 +4,9 @@ services:
     container_name: ecom_postgres
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: adminpassword
-      POSTGRES_DB: postgres 
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./init-scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
@@ -14,14 +14,19 @@ services:
       - "5432:5432"
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mongodb:
     image: mongo:6
     container_name: ecom_mongodb
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: adminpassword
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ADMIN_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ADMIN_PASS}
     volumes:
       - mongo_data:/data/db
     ports:
@@ -34,8 +39,8 @@ services:
     container_name: ecom_rabbitmq
     restart: always
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: adminpassword
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS}
     ports:
       - "5672:5672"   
       - "15672:15672" 
@@ -43,6 +48,24 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - ecom_network
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=${PORT}
+    networks:
+      - ecom_network
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 networks:
   ecom_network:
