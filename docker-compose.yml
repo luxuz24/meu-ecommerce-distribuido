@@ -81,7 +81,20 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started      
+        condition: service_started   
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
+    networks:
+      - ecom_network
+    depends_on:
+      rabbitmq:
+        condition: service_started   
 
 networks:
   ecom_network:
