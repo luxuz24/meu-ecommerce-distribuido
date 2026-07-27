@@ -1,11 +1,14 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
 import { connectDB } from './infra/database/mongo.js';
+import { productRoutes } from './infra/http/routes/product.routes.js';
 
 const app = Fastify({ logger: true });
 app.get('/health', async (request, reply) => {
             return { status: 'OK', service: 'catalog-service', timestamp: new Date()};
         });
+
+app.register(productRoutes, { prefix: 'api' });
 
 async function start() {
     try{
