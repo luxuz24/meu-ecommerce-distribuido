@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { type FastifyInstance, type FastifyRequest, type FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import pg from 'pg';
 import { PrismaPg } from "@prisma/adapter-pg";

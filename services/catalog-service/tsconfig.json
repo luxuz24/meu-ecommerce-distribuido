@@ -4,7 +4,7 @@
     "outDir": "./dist",
     
     "module": "nodenext",
-    "target": "esnext",
+    "target": "ES2024",
     
     "types": ["node"],
     
