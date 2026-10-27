@@ -12,6 +12,10 @@ build/
 .env
 .env.test
 
+# Local UI references (Stitch)
+Front_referencias/
+front_references/
+
 # OS
 .DS_Store
 Thumbs.db

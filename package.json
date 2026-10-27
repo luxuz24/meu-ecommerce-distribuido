@@ -4,15 +4,18 @@
   "description": "Distributed e-commerce microservices platform",
   "private": true,
   "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
     "test:user": "npm --prefix services/user-service test",
     "test:catalog": "npm --prefix services/catalog-service test",
     "test:outbox": "npm --prefix services/user-outbox-processor test",
     "test:notification": "npm --prefix services/notification-service test",
-    "test": "npm run test:user && npm run test:catalog && npm run test:outbox && npm run test:notification",
+    "test:frontend": "npm --prefix frontend test",
+    "test": "npm run test:user && npm run test:catalog && npm run test:outbox && npm run test:notification && npm run test:frontend",
     "build:user": "npm --prefix services/user-service run build",
     "build:catalog": "npm --prefix services/catalog-service run build",
     "build:outbox": "npm --prefix services/user-outbox-processor run build",
     "build:notification": "npm --prefix services/notification-service run build",
-    "build": "npm run build:user && npm run build:catalog && npm run build:outbox && npm run build:notification"
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run build:user && npm run build:catalog && npm run build:outbox && npm run build:notification && npm run build:frontend"
   }
 }

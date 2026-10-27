@@ -114,6 +114,24 @@ services:
     depends_on:
       - mongodb   
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: microstore-frontend
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - VITE_USER_API_URL=http://localhost:3000
+      - VITE_CATALOG_API_URL=http://localhost:3001
+      - VITE_DEV_TELEMETRY=true
+    networks:
+      - ecom_network
+    depends_on:
+      - user-service
+      - catalog-service
+
 networks:
   ecom_network:
     driver: bridge

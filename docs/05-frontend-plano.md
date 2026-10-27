@@ -3,39 +3,25 @@
 ## Objetivo
 SPA/SSR loja virtual que consome user-service e catalog-service (e, depois, order/payment), em `frontend/` na raiz do monorepo.
 
-## Stack proposta (confirmar com o time antes de iniciar)
-- **Next.js (App Router) + TypeScript**, Tailwind CSS, TanStack Query, Zod + React Hook Form.
-- Alternativa: Vite + React. Decisão pendente.
-- Testes: Vitest + Testing Library; E2E: Playwright.
+## Stack implementada
+- **Vite + React 19 + TypeScript**, Tailwind CSS (tema *Distributed Commerce Minimalist* gerado no Stitch), React Router v7.
+- Testes: Vitest (`src/__tests__/api.test.ts`).
 
-## Estrutura sugerida
-```
-frontend/
-├── src/
-│   ├── app/                # rotas (login, register, products, cart, orders, admin)
-│   ├── features/{auth,catalog,cart,orders}/   # components, hooks, api, schemas
-│   ├── shared/{ui,lib,config}/
-│   └── services/http.ts    # cliente fetch/axios com baseURL + Bearer
-├── .env.example            # NEXT_PUBLIC_USER_API_URL, NEXT_PUBLIC_CATALOG_API_URL
-└── Dockerfile
-```
-
-## Integração com o backend
-- URLs: user `http://localhost:3000`, catalog `http://localhost:3001/api`.
-- Auth: `POST /login` → guardar `tokenJwt` (preferir cookie httpOnly via route handler do Next; evitar localStorage se possível); enviar `Authorization: Bearer`.
-- **Pré-requisito backend**: habilitar CORS (Fase 0). Recomendado futuro: API Gateway/BFF único para evitar múltiplas origens.
-- Listagem de produtos depende de `GET /api/products` (Fase 2) — até lá usar mock/MSW.
+## Diretriz de Telemetria de Desenvolvimento vs. Produção Limpa
+- Durante o desenvolvimento das fases de backend e integração, o frontend conta com widgets de telemetria e diagnóstico (`<DevOnly>`, `<EndpointBar>`, `<JsonInspectorDrawer>`, simuladores de erro 401/404, latência em `ms` e health check de `:3000` e `:3001`) isolados em `frontend/src/components/telemetry/DevTelemetry.tsx` e controlados pelo `TelemetryContext` (`VITE_DEV_TELEMETRY` + botão `Dev Telemetry: ON / Modo Limpo` no topo).
+- **Regra para versões finais**: Todo código de telemetria/teste está encapsulado em `<DevOnly>`. Na versão final para o usuário, basta desativar `VITE_DEV_TELEMETRY=false` e remover `components/telemetry/` para entregar uma loja 100% limpa ao consumidor final.
+- Referências visuais brutas do Stitch ficam na pasta local `Front_referencias/` (ignorada no `.gitignore`, não versionada no Git).
 
 ## Fases do frontend
-| Fase | Entrega | Depende de |
-|---|---|---|
-| F0 | Scaffold, lint, cliente HTTP, layout, Dockerfile + entrada no compose | — |
-| F1 | Cadastro, login, logout, rota protegida, página de perfil (`/users/me`) | CORS |
-| F2 | Catálogo: listagem, busca, detalhe | `GET /api/products` |
-| F3 | Admin: CRUD de produtos | Roles + endpoints protegidos (Fase 3 backend) |
-| F4 | Carrinho (cliente) e checkout | order-service |
-| F5 | Meus pedidos, status de pagamento (polling/SSE) | order/payment |
-| F6 | Notificações em tempo real (opcional), E2E, CI | notification evolução |
+| Fase | Entrega | Depende de | Status |
+|---|---|---|---|
+| F0 | Scaffold, lint, cliente HTTP, layout, Dockerfile + entrada no compose (`:3002`) | — | ✅ |
+| F1 | Cadastro (`POST /users`), login (`POST /login`), logout, página de perfil (`GET /users/me`) | CORS | ✅ |
+| F2 | Catálogo: listagem paginada, busca (`?q=`), filtros e detalhe (`GET /api/products/:id`) | `GET /api/products` | ✅ |
+| F3 | Admin: CRUD de produtos (`POST`, `PATCH`, `DELETE` soft delete + reativação) | `catalog-service` CRUD | ✅ (proteção JWT admin na Fase 3 backend) |
+| F4 | Carrinho (cliente) e checkout | order-service | ⬜ |
+| F5 | Meus pedidos, status de pagamento (polling/SSE) | order/payment | ⬜ |
+| F6 | Notificações em tempo real (opcional), E2E, CI | notification evolução | ⬜ |
 
 ## Regras
 - Tipos/contratos espelham `04-contratos-api-e-eventos.md`; atualizar ambos juntos.
