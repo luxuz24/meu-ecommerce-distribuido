@@ -22,7 +22,7 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 
 ### catalog-service (MongoDB)
 - ✅ Conexão Mongo, model Product, `POST /api/products` (valida SKU único, preço/estoque ≥ 0), `GET /health`
-- 🟡 `ListProductsUseCase` existe mas está vazio
+- ✅ `GET /api/products` (paginação, busca `q`, filtro `active`), `GET /api/products/:id`, `PATCH /api/products/:id`, `DELETE /api/products/:id` (soft delete)
 
 ## B. O que falta (por fase)
 
@@ -52,11 +52,11 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ Validação de entrada com schema em `/login` e `/users`; testes unitários puros com fakes in-memory
 
 ### Fase 2 — Catalog completo
-- ⬜ Mover DTOs/interfaces para `domain/`; composition root
-- ⬜ `GET /api/products` (paginação, filtro por nome/ativo), `GET /api/products/:id`
-- ⬜ `PUT/PATCH /api/products/:id`, `DELETE` (soft via `isActive`)
+- ✅ Mover DTOs/interfaces para `domain/`; composition root (`infra/container.ts`)
+- ✅ `GET /api/products` (paginação, filtro por nome/SKU e status ativo), `GET /api/products/:id`
+- ✅ `PATCH /api/products/:id`, `DELETE /api/products/:id` (soft via `isActive`)
 - ⬜ Proteger escrita por JWT (role admin — ver Fase 3)
-- ⬜ Schemas Fastify (validação + resposta)
+- ✅ Schemas Fastify (validação de body, params e querystring)
 - ⬜ Outbox no catálogo (ou publisher direto) para eventos `PRODUCT_CREATED/UPDATED`
 
 ### Fase 3 — Autorização e identidade

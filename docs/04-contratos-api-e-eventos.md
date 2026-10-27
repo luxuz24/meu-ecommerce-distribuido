@@ -19,12 +19,12 @@ JWT: HS256, payload `{userId,email}`, expira em 1h, segredo `JWT_SECRET`. Header
 |---|---|---|---|---|
 | GET | `/health` | — | ✅ | (sem prefixo `/api`) |
 | POST | `/api/products` | — (🕓 admin) | ✅ | Body `{name,description,sku,price≥0,stock≥0}` → 201 produto; 400 SKU duplicado/valores negativos |
-| GET | `/api/products` | — | 🕓 | `?page&limit&q&active` |
-| GET | `/api/products/:id` | — | 🕓 | Detalhe |
-| PATCH | `/api/products/:id` | admin | 🕓 | Atualizar |
-| DELETE | `/api/products/:id` | admin | 🕓 | Soft delete (`isActive=false`) |
+| GET | `/api/products` | — | ✅ | `?page&limit&q&active` → `{items, total, page, limit, totalPages}` |
+| GET | `/api/products/:id` | — | ✅ | Detalhe do produto → 200 produto; 404 não encontrado |
+| PATCH | `/api/products/:id` | — (🕓 admin) | ✅ | Atualizar campos parciais → 200 produto; 400/404 |
+| DELETE | `/api/products/:id` | — (🕓 admin) | ✅ | Soft delete (`isActive=false`) → 204; 404 |
 
-Produto: `{id, name, description, sku, price, stock, createdAt}` (model também tem `isActive`, `updatedAt`).
+Produto: `{id, name, description, sku, price, stock, isActive, createdAt, updatedAt}`.
 
 ## order / payment / inventory 🕓
 Contratos serão definidos aqui antes da implementação (Fase 4). Rotas previstas: `POST /api/orders`, `GET /api/orders`, `GET /api/orders/:id`, `GET /api/payments/:orderId`.

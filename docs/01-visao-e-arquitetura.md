@@ -48,7 +48,7 @@ src/
 
 | Serviço | Situação |
 |---|---|
-| catalog-service | **Mais próximo do alvo**: `IProductRepository` + `MongoProductRepository` (infra) + use case + controller/rotas. Falta pasta `domain/` (interfaces/DTOs estão dentro do use case). Controller instancia dependências manualmente (sem composition root). `ListProductsUseCase.ts` está **vazio**. |
+| catalog-service | **Totalmente alinhado**: Camadas `domain/` (`Product`, erros tipados, `IProductRepository`), 5 use cases desacoplados (`Create`, `List`, `GetById`, `Update`, `Delete`), `MongoProductRepository` em `infra/` e composition root (`container.ts`). |
 | user-service | **Totalmente alinhado**: Camadas `domain/` (`User`, erros tipados, `IUserRepository`, `IPasswordHasher`, `ITokenService`), use cases desacoplados de bibliotecas externas, implementações em `infra/` e composition root (`container.ts`). |
 | workers (outbox/notification) | Arquivo único `index.ts`; sem camadas. Aceitável por ora, refatorar ao crescer. |
 

@@ -1,40 +1,122 @@
-import { type IProductRepository, type CreateProductDTO, type Product } from '../../../use-cases/CreateProductUseCase.js';
-import { ProductModel } from '../models/ProductModel.js';
+import mongoose from 'mongoose';
+import { Product } from '../../../domain/entities/Product.js';
+import {
+  type IProductRepository,
+  type CreateProductDTO,
+  type UpdateProductDTO,
+  type ListProductsParams,
+  type PaginatedProducts,
+} from '../../../domain/repositories/IProductRepository.js';
+import { ProductModel, type IProduct } from '../models/ProductModel.js';
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export class MongoProductRepository implements IProductRepository {
-  
+  private mapToDomain(document: IProduct): Product {
+    const obj = document.toObject();
+    return new Product({
+      id: obj._id.toString(),
+      name: obj.name,
+      description: obj.description,
+      sku: obj.sku,
+      price: obj.price,
+      stock: obj.stock,
+      isActive: obj.isActive,
+      createdAt: obj.createdAt,
+      updatedAt: obj.updatedAt,
+    });
+  }
+
   async findBySKU(sku: string): Promise<Product | null> {
-    const document = await ProductModel.findOne({ sku }).exec();
+    const document = await ProductModel.findOne({ sku: String(sku) }).exec();
     if (!document) return null;
+    return this.mapToDomain(document);
+  }
 
-    
-    const productObj = document.toObject();
+  async findById(id: string): Promise<Product | null> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return null;
+    }
+    const document = await ProductModel.findById(id).exec();
+    if (!document) return null;
+    return this.mapToDomain(document);
+  }
 
-    
+  async list(params: ListProductsParams = {}): Promise<PaginatedProducts> {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, unknown> = {};
+
+    if (params.active !== undefined) {
+      filter.isActive = Boolean(params.active);
+    }
+
+    if (params.q && params.q.trim().length > 0) {
+      const safeRegex = new RegExp(escapeRegex(params.q.trim()), 'i');
+      filter.$or = [{ name: safeRegex }, { description: safeRegex }, { sku: safeRegex }];
+    }
+
+    const [documents, total] = await Promise.all([
+      ProductModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).exec(),
+      ProductModel.countDocuments(filter).exec(),
+    ]);
+
     return {
-      id: productObj._id.toString(),
-      name: productObj.name,
-      description: productObj.description,
-      sku: productObj.sku,
-      price: productObj.price,
-      stock: productObj.stock,
-      createdAt: productObj.createdAt
+      items: documents.map((doc) => this.mapToDomain(doc)),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     };
   }
 
   async create(data: CreateProductDTO): Promise<Product> {
-    const document = await ProductModel.create(data);
-    const productObj = document.toObject();
+    const document = await ProductModel.create({
+      name: String(data.name),
+      description: String(data.description),
+      sku: String(data.sku),
+      price: Number(data.price),
+      stock: Number(data.stock),
+    });
+    return this.mapToDomain(document);
+  }
 
-    
-    return {
-      id: productObj._id.toString(),
-      name: productObj.name,
-      description: productObj.description,
-      sku: productObj.sku,
-      price: productObj.price,
-      stock: productObj.stock,
-      createdAt: productObj.createdAt
-    };
+  async update(id: string, data: UpdateProductDTO): Promise<Product | null> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return null;
+    }
+
+    const updateFields: Record<string, unknown> = {};
+    if (data.name !== undefined) updateFields.name = String(data.name);
+    if (data.description !== undefined) updateFields.description = String(data.description);
+    if (data.price !== undefined) updateFields.price = Number(data.price);
+    if (data.stock !== undefined) updateFields.stock = Number(data.stock);
+    if (data.isActive !== undefined) updateFields.isActive = Boolean(data.isActive);
+
+    const document = await ProductModel.findByIdAndUpdate(
+      id,
+      { $set: updateFields },
+      { returnDocument: 'after' }
+    ).exec();
+
+    if (!document) return null;
+    return this.mapToDomain(document);
+  }
+
+  async softDelete(id: string): Promise<boolean> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return false;
+    }
+    const document = await ProductModel.findByIdAndUpdate(
+      id,
+      { $set: { isActive: false } },
+      { returnDocument: 'after' }
+    ).exec();
+
+    return document !== null;
   }
 }
