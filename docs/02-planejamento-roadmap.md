@@ -45,11 +45,11 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ Testes unitários dos use cases (user e catalog) e parsers dos workers (15 testes passando)
 
 ### Fase 1 — Clean Architecture no user-service
-- ⬜ Criar `domain/` (`User`, `IUserRepository`, `IPasswordHasher`, `ITokenService`, `IOutboxRepository`)
-- ⬜ Implementações em `infra/` (PrismaUserRepository, BcryptHasher, JwtTokenService)
-- ⬜ Use cases recebem interfaces; composition root (`infra/container.ts`)
-- ⬜ Erros de domínio (`UserAlreadyExistsError`, `InvalidCredentialsError`, ...) mapeados no HTTP
-- ⬜ Validação de entrada em `/login`; testes unitários dos use cases
+- ✅ Criar `domain/` (`User`, `IUserRepository`, `IPasswordHasher`, `ITokenService`)
+- ✅ Implementações em `infra/` (PrismaUserRepository, BcryptPasswordHasher, JwtTokenService)
+- ✅ Use cases recebem interfaces; composition root (`infra/container.ts`)
+- ✅ Erros de domínio (`UserAlreadyExistsError`, `InvalidCredentialsError`, `UserNotFoundError`) tipados
+- ✅ Validação de entrada com schema em `/login` e `/users`; testes unitários puros com fakes in-memory
 
 ### Fase 2 — Catalog completo
 - ⬜ Mover DTOs/interfaces para `domain/`; composition root

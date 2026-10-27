@@ -1,47 +1,50 @@
-import { PrismaClient } from '@prisma/client';
-import  bcrypt from 'bcrypt';
+import { type IUserRepository } from '../domain/repositories/IUserRepository.js';
+import { type IPasswordHasher } from '../domain/services/IPasswordHasher.js';
+import { UserAlreadyExistsError } from '../domain/errors/UserAlreadyExistsError.js';
 
+export interface CreateUserResponse {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+}
 
 export class CreateUserUseCase {
-    constructor(private readonly prisma: PrismaClient) {};
+  constructor(
+    private readonly userRepository: IUserRepository,
+    private readonly passwordHasher: IPasswordHasher
+  ) {}
 
-    async execute(name:string, email:string, passwordPlain:string) {
+  async execute(name: string, email: string, passwordPlain: string): Promise<CreateUserResponse> {
+    const userExists = await this.userRepository.findByEmail(email);
 
-        const userExists = await this.prisma.user.findUnique({
-            where: {email},
-        });
+    if (userExists) {
+      throw new UserAlreadyExistsError(email);
+    }
 
-        if (userExists) {
-            throw new Error('USER_ALREADY_EXISTS');
-        }
+    const hashedPassword = await this.passwordHasher.hash(passwordPlain);
 
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(passwordPlain, saltRounds);
+    const user = await this.userRepository.createWithOutbox(
+      {
+        name,
+        email,
+        passwordHash: hashedPassword,
+      },
+      {
+        aggregateType: 'User',
+        eventType: 'USER_CREATED',
+        payload: {
+          name,
+          email,
+        },
+      }
+    );
 
-        const result = await this.prisma.$transaction( async (tx)=>{
-            const user = await tx.user.create({
-                data:{
-                    name,
-                    email,
-                    password: hashedPassword,
-                },
-            });
-
-            await tx.outbox.create({
-                data:{
-                    aggregateType: 'User',
-                    aggregateId: user.id,
-                    eventType: 'USER_CREATED',
-                    payload: {
-                        id: user.id,
-                        name: user.name,
-                        email: user.email,
-                    },
-                },
-            });
-            return user;
-        });
-        const {password, ...userWithoutPassword} = result;
-        return userWithoutPassword;
-}
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+    };
+  }
 }

@@ -1,19 +1,22 @@
-import { PrismaClient } from '@prisma/client';
+import { type IUserRepository } from '../domain/repositories/IUserRepository.js';
+import { UserNotFoundError } from '../domain/errors/UserNotFoundError.js';
+
+export interface UserProfileResponse {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export class GetUserProfileUseCase {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private readonly userRepository: IUserRepository) {}
 
-  async execute(userId: string) {
-    
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+  async execute(userId: string): Promise<UserProfileResponse> {
+    const user = await this.userRepository.findById(userId);
 
     if (!user) {
-      throw new Error('USER_NOT_FOUND');
+      throw new UserNotFoundError(userId);
     }
 
-    
     return {
       id: user.id,
       name: user.name,
