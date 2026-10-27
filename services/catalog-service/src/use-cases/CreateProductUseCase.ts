@@ -1,36 +1,27 @@
+import { Product } from '../domain/entities/Product.js';
+import {
+  type IProductRepository,
+  type CreateProductDTO,
+} from '../domain/repositories/IProductRepository.js';
+import { ProductAlreadyExistsError } from '../domain/errors/ProductAlreadyExistsError.js';
+import { InvalidProductDataError } from '../domain/errors/InvalidProductDataError.js';
 
-export interface CreateProductDTO {
-    name: string;
-    description: string;
-    sku: string;
-    price: number;
-    stock: number;
-}
+export { type CreateProductDTO, type IProductRepository, Product };
 
-export interface Product extends CreateProductDTO {
-    id: string; 
-    createdAt: Date;
-}
-
-export interface IProductRepository {
-    findBySKU(sku: string): Promise<Product | null>;
-    create(data: CreateProductDTO): Promise<Product>;
-}
 export class CreateProductUseCase {
+  constructor(private readonly productRepository: IProductRepository) {}
 
-    constructor(private readonly productRepository: IProductRepository) {}
-    
-    async execute(data: CreateProductDTO) {
-        const existingProduct = await this.productRepository.findBySKU(data.sku);
-        if (existingProduct) {
-            throw new Error(`Product with SKU ${data.sku} already exists.`);
-        }
-        
-        if (data.price < 0 || data.stock < 0) {
-            throw new Error("Price and stock must be non-negative values.");
-        }
-
-        const product = await this.productRepository.create(data);
-        return product;
+  async execute(data: CreateProductDTO): Promise<Product> {
+    const existingProduct = await this.productRepository.findBySKU(data.sku);
+    if (existingProduct) {
+      throw new ProductAlreadyExistsError(data.sku);
     }
+
+    if (data.price < 0 || data.stock < 0) {
+      throw new InvalidProductDataError('Price and stock must be non-negative values.');
+    }
+
+    const product = await this.productRepository.create(data);
+    return product;
+  }
 }
