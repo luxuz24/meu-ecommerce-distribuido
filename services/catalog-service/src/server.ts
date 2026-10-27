@@ -14,7 +14,7 @@ async function start() {
     try{
         console.log("initializing catalog-service...");
         await connectDB();
-        const port = Number(process.env.PORT);
+        const port = Number(process.env.PORT) || 3001;
         await app.listen({ port, host:'0.0.0.0'});
         console.log(`catalog-service is running on port ${port}`);
     }catch (err) {
