@@ -1,0 +1,56 @@
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface LoginResponse {
+  tokenJwt: string;
+  user: User;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  price: number;
+  stock: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PaginatedProducts {
+  items: Product[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CreateProductInput {
+  name: string;
+  description: string;
+  sku: string;
+  price: number;
+  stock: number;
+}
+
+export interface UpdateProductInput {
+  name?: string;
+  description?: string;
+  price?: number;
+  stock?: number;
+  isActive?: boolean;
+}
+
+export interface ApiTelemetryRecord {
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  endpoint: string;
+  service: string;
+  statusCode: number;
+  latencyMs: number;
+  responseBody: unknown;
+  timestamp: string;
+}
