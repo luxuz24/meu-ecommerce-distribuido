@@ -1,20 +1,9 @@
 import { type FastifyInstance, type FastifyRequest, type FastifyReply } from "fastify";
-import { PrismaClient } from "@prisma/client";
-import pg from 'pg';
-import { PrismaPg } from "@prisma/adapter-pg";
-
-import { LoginUserUseCase } from "../../../use-cases/LoginUseCase.js";
-import { CreateUserUseCase } from "../../../use-cases/CreateUserUseCase.js";
+import { createUserUseCase, loginUserUseCase, getUserProfileUseCase } from "../../container.js";
 import { authMiddleware } from "../middlewares/AuthMiddleware.js";
-import { GetUserProfileUseCase } from '../../../use-cases/GetUserProfileUseCase.js';
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
-const createUserUseCase = new CreateUserUseCase(prisma);
-const loginUserUseCase = new LoginUserUseCase(prisma);
-const getUserProfileUseCase = new GetUserProfileUseCase(prisma);
+import { UserAlreadyExistsError } from "../../../domain/errors/UserAlreadyExistsError.js";
+import { InvalidCredentialsError } from "../../../domain/errors/InvalidCredentialsError.js";
+import { UserNotFoundError } from "../../../domain/errors/UserNotFoundError.js";
 
 export async function userRoutes(app: FastifyInstance) {
   
@@ -56,8 +45,8 @@ export async function userRoutes(app: FastifyInstance) {
         const user = await createUserUseCase.execute(name, email, password);
         return reply.status(201).send(user);
       } catch (error: any) {
-        if (error.message === 'USER_ALREADY_EXISTS') {
-          return reply.status(400).send({ error: 'User with this email already exists' });
+        if (error instanceof UserAlreadyExistsError) {
+          return reply.status(400).send({ error: error.message });
         }
         request.log.error(error);
         return reply.status(500).send({ error: 'Internal Server Error' });
@@ -92,11 +81,11 @@ export async function userRoutes(app: FastifyInstance) {
         const result = await loginUserUseCase.execute(data);
         return reply.status(200).send(result);
       } catch (error: any) {
-        if (error.message === 'INVALID_CREDENTIALS!') {
-          return reply.status(401).send({ error: 'INVALID_CREDENTIALS!' });
+        if (error instanceof InvalidCredentialsError) {
+          return reply.status(401).send({ error: error.message });
         }
         
-        console.error(error);
+        request.log.error(error);
         return reply.status(500).send({ error: 'Internal Server Error' });
       }
     }
@@ -109,9 +98,10 @@ export async function userRoutes(app: FastifyInstance) {
 
       return reply.status(200).send(freshUserData);
     } catch (error: any) {
-      if (error.message === 'USER_NOT_FOUND') {
-        return reply.status(404).send({ error: 'USER_NOT_FOUND' });
+      if (error instanceof UserNotFoundError) {
+        return reply.status(404).send({ error: error.message });
       }
+      request.log.error(error);
       return reply.status(500).send({ error: 'Internal Server Error' });
     }
   });

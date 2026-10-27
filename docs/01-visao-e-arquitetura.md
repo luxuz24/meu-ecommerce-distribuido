@@ -49,7 +49,7 @@ src/
 | Serviço | Situação |
 |---|---|
 | catalog-service | **Mais próximo do alvo**: `IProductRepository` + `MongoProductRepository` (infra) + use case + controller/rotas. Falta pasta `domain/` (interfaces/DTOs estão dentro do use case). Controller instancia dependências manualmente (sem composition root). `ListProductsUseCase.ts` está **vazio**. |
-| user-service | **Fora do alvo**: use cases recebem `PrismaClient` diretamente e usam `bcrypt`/`jsonwebtoken` inline; `PrismaClient` é criado no controller; erros por string (`'USER_ALREADY_EXISTS'`). Precisa refatorar (ver roadmap, Fase 1). |
+| user-service | **Totalmente alinhado**: Camadas `domain/` (`User`, erros tipados, `IUserRepository`, `IPasswordHasher`, `ITokenService`), use cases desacoplados de bibliotecas externas, implementações em `infra/` e composition root (`container.ts`). |
 | workers (outbox/notification) | Arquivo único `index.ts`; sem camadas. Aceitável por ora, refatorar ao crescer. |
 
 ## Débitos técnicos conhecidos

@@ -1,57 +1,72 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { CreateUserUseCase } from './CreateUserUseCase.js';
-import type { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { User } from '../domain/entities/User.js';
+import type { IUserRepository, CreateUserData, CreateOutboxData } from '../domain/repositories/IUserRepository.js';
+import type { IPasswordHasher } from '../domain/services/IPasswordHasher.js';
+import { UserAlreadyExistsError } from '../domain/errors/UserAlreadyExistsError.js';
+
+class InMemoryUserRepository implements IUserRepository {
+  public users: User[] = [];
+  public outboxEvents: CreateOutboxData[] = [];
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.users.find((u) => u.email === email) ?? null;
+  }
+
+  async findById(id: string): Promise<User | null> {
+    return this.users.find((u) => u.id === id) ?? null;
+  }
+
+  async createWithOutbox(data: CreateUserData, outbox: CreateOutboxData): Promise<User> {
+    const user = new User({
+      id: `user-${Date.now()}`,
+      name: data.name,
+      email: data.email,
+      password: data.passwordHash,
+      createdAt: new Date(),
+    });
+    this.users.push(user);
+    this.outboxEvents.push(outbox);
+    return user;
+  }
+}
+
+class FakePasswordHasher implements IPasswordHasher {
+  async hash(plainText: string): Promise<string> {
+    return `hashed_${plainText}`;
+  }
+
+  async compare(plainText: string, hash: string): Promise<boolean> {
+    return `hashed_${plainText}` === hash;
+  }
+}
 
 describe('CreateUserUseCase', () => {
   it('should create a new user and generate outbox event', async () => {
-    const mockUser = {
-      id: 'user-uuid-123',
-      name: 'Lucas Ortiz',
-      email: 'lucas@example.com',
-      password: 'hashedpassword',
-      createdAt: new Date(),
-    };
+    const userRepository = new InMemoryUserRepository();
+    const passwordHasher = new FakePasswordHasher();
+    const useCase = new CreateUserUseCase(userRepository, passwordHasher);
 
-    const mockPrisma = {
-      user: {
-        findUnique: vi.fn().mockResolvedValue(null),
-        create: vi.fn().mockResolvedValue(mockUser),
-      },
-      outbox: {
-        create: vi.fn().mockResolvedValue({ id: 'outbox-123' }),
-      },
-      $transaction: vi.fn().mockImplementation(async (callback) => {
-        return callback(mockPrisma);
-      }),
-    } as unknown as PrismaClient;
-
-    const useCase = new CreateUserUseCase(mockPrisma);
     const result = await useCase.execute('Lucas Ortiz', 'lucas@example.com', 'password123');
 
-    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
-      where: { email: 'lucas@example.com' },
-    });
-    expect(mockPrisma.$transaction).toHaveBeenCalled();
-    expect(result).toEqual({
-      id: 'user-uuid-123',
-      name: 'Lucas Ortiz',
-      email: 'lucas@example.com',
-      createdAt: mockUser.createdAt,
-    });
+    expect(result.id).toBeDefined();
+    expect(result.name).toBe('Lucas Ortiz');
+    expect(result.email).toBe('lucas@example.com');
     expect((result as any).password).toBeUndefined();
+
+    expect(userRepository.users).toHaveLength(1);
+    expect(userRepository.outboxEvents).toHaveLength(1);
+    expect(userRepository.outboxEvents[0]?.eventType).toBe('USER_CREATED');
   });
 
-  it('should throw USER_ALREADY_EXISTS when email is already registered', async () => {
-    const mockPrisma = {
-      user: {
-        findUnique: vi.fn().mockResolvedValue({ id: 'existing-id', email: 'lucas@example.com' }),
-      },
-    } as unknown as PrismaClient;
+  it('should throw UserAlreadyExistsError when email is already registered', async () => {
+    const userRepository = new InMemoryUserRepository();
+    const passwordHasher = new FakePasswordHasher();
+    const useCase = new CreateUserUseCase(userRepository, passwordHasher);
 
-    const useCase = new CreateUserUseCase(mockPrisma);
+    await useCase.execute('Lucas Ortiz', 'lucas@example.com', 'password123');
 
     await expect(useCase.execute('Lucas Ortiz', 'lucas@example.com', 'password123'))
-      .rejects.toThrow('USER_ALREADY_EXISTS');
+      .rejects.toBeInstanceOf(UserAlreadyExistsError);
   });
 });
