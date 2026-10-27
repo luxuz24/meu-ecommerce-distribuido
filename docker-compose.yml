@@ -11,7 +11,7 @@ services:
       - pg_data:/var/lib/postgresql/data
       - ./init-scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5434}:5432"
     networks:
       - ecom_network
     healthcheck:
@@ -95,6 +95,22 @@ services:
     depends_on:
       rabbitmq:
         condition: service_started   
+
+  catalog-service:
+    build:
+      context: ./services/catalog-service
+      dockerfile: Dockerfile
+    container_name: catalog-service
+    restart: unless-stopped
+    ports:
+      - "${CATALOG_PORT:-3001}:${CATALOG_PORT:-3001}"
+    environment:
+      - PORT=${CATALOG_PORT:-3001}
+      - MONGO_URI=mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASS}@mongodb:27017/catalog_db?authSource=admin
+    networks:
+      - ecom_network
+    depends_on:
+      - mongodb   
 
 networks:
   ecom_network:
