@@ -21,10 +21,17 @@ export async function userRoutes(app: FastifyInstance) {
   app.post(
     '/users',
     {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+        },
+      },
       schema: {
         body: {
           type: 'object',
           required: ['name', 'email', 'password'],
+          additionalProperties: false,
           properties: {
             name: { type: 'string', minLength: 2 },
             email: { type: 'string', format: 'email' },
@@ -58,20 +65,42 @@ export async function userRoutes(app: FastifyInstance) {
     }
   );
 
-  app.post('/login', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const data = request.body as any;
-      const result = await loginUserUseCase.execute(data);
-      return reply.status(200).send(result);
-    } catch (error: any) {
-      if (error.message === 'INVALID_CREDENTIALS!') {
-        return reply.status(401).send({ error: 'INVALID_CREDENTIALS!' });
+  app.post(
+    '/login',
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+        },
+      },
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email', 'password'],
+          additionalProperties: false,
+          properties: {
+            email: { type: 'string', format: 'email' },
+            password: { type: 'string', minLength: 6 },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const data = request.body as any;
+        const result = await loginUserUseCase.execute(data);
+        return reply.status(200).send(result);
+      } catch (error: any) {
+        if (error.message === 'INVALID_CREDENTIALS!') {
+          return reply.status(401).send({ error: 'INVALID_CREDENTIALS!' });
+        }
+        
+        console.error(error);
+        return reply.status(500).send({ error: 'Internal Server Error' });
       }
-      
-      console.error(error);
-      return reply.status(500).send({ error: 'Internal Server Error' });
     }
-  });
+  );
 
   app.get('/users/me', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
