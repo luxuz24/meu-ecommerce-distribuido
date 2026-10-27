@@ -61,6 +61,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       - JWT_SECRET=${JWT_SECRET}
       - PORT=${PORT}
+      - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
     depends_on:
@@ -107,6 +108,7 @@ services:
     environment:
       - PORT=${CATALOG_PORT:-3001}
       - MONGO_URI=mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASS}@mongodb:27017/catalog_db?authSource=admin
+      - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
     depends_on:

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  services:
+    name: Build & Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - user-service
+          - catalog-service
+          - user-outbox-processor
+          - notification-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: 'services/${{ matrix.service }}/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Generate Prisma Client (user-service only)
+        if: matrix.service == 'user-service'
+        working-directory: services/${{ matrix.service }}
+        run: npx prisma generate
+
+      - name: Typecheck / Build
+        working-directory: services/${{ matrix.service }}
+        run: npm run build
+
+      - name: Run Unit Tests
+        working-directory: services/${{ matrix.service }}
+        run: npm test
+
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy env examples for build
+        run: |
+          cp .env.example .env
+          cp services/user-service/.env.example services/user-service/.env
+          cp services/catalog-service/.env.example services/catalog-service/.env
+          cp services/user-outbox-processor/.env.example services/user-outbox-processor/.env
+          cp services/notification-service/.env.example services/notification-service/.env
+
+      - name: Validate Docker Compose Build
+        run: docker compose build

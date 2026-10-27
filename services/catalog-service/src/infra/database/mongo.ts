@@ -8,6 +8,8 @@ export async function connectDB(): Promise<void>{
     }
 
     try{    
+        mongoose.set('strictQuery', true);
+        mongoose.set('sanitizeFilter', true);
         await mongoose.connect(url);
         console.log("MongoDB connected successfully");
     }catch (error) {

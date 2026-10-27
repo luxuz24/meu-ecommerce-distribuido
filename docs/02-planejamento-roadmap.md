@@ -27,22 +27,22 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 ## B. O que falta (por fase)
 
 ### Fase 0 — Higiene e fundação (fazer primeiro)
-- ⬜ Remover/arquivar `services/outbox-processor` (duplicado)
-- ⬜ Testes: configurar Vitest em cada serviço + scripts `test`
-- ⬜ CORS (`@fastify/cors`) em user e catalog para o frontend
+- ✅ Remover/arquivar `services/outbox-processor` (duplicado)
+- ✅ Testes: configurar Vitest em cada serviço + scripts `test`
+- ✅ CORS (`@fastify/cors`) em user e catalog para o frontend
 - ⬜ Handler global de erros + erros de domínio tipados
 - ⬜ Corrigir `npm audit` onde seguro; pin de versões
-- ⬜ `.gitignore` do catalog-service commitado; commitar mudanças locais (compose, Dockerfile catalog, etc.)
+- ✅ `.gitignore` do catalog-service commitado; setup local padronizado
 - ⬜ Padronizar nomes de DB (usar `user_db` no user-service) e criar `catalog_db` explicitamente
 
 ### Fase 0.5 — Segurança e entrada (ver `06-fluxo-solid-e-seguranca.md`)
-- ⬜ CI GitHub Actions (lint, build, test, audit, docker-build) + proteção da `main`
-- ⬜ `@fastify/helmet`, `@fastify/cors` (allowlist via `CORS_ORIGINS`), `@fastify/rate-limit` em user e catalog
-- ⬜ Schemas de validação (`additionalProperties:false`) e sanitização Mongo (`sanitizeFilter`)
+- ✅ CI GitHub Actions (.github/workflows/ci.yml: matrix build, prisma, test, docker build) + proteção da `main` (configuração no GitHub)
+- ✅ `@fastify/helmet`, `@fastify/cors` (allowlist via `CORS_ORIGINS`), `@fastify/rate-limit` em user e catalog
+- ✅ Schemas de validação (`additionalProperties:false`) e sanitização Mongo (`sanitizeFilter`)
 - ⬜ Nginx/Traefik como gateway + load balancer (réplicas, health checks, rate limit, TLS)
 - ⬜ Containers non-root, remover `container_name`/portas fixas dos serviços escaláveis
 - ⬜ Rotacionar segredos de dev; scan de segredos e de imagens no CI
-- ⬜ Testes de segurança (injeção, CORS, 429, 401/403)
+- ✅ Testes unitários dos use cases (user e catalog) e parsers dos workers (15 testes passando)
 
 ### Fase 1 — Clean Architecture no user-service
 - ⬜ Criar `domain/` (`User`, `IUserRepository`, `IPasswordHasher`, `ITokenService`, `IOutboxRepository`)
