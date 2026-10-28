@@ -5,6 +5,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { prisma } from "./infra/database/prisma.js";
 import { userRoutes } from "./infra/http/controllers/UserController.js";
+import { ensureAdminUserUseCase } from "./infra/container.js";
 
 const app = Fastify({
     logger: true,
@@ -61,6 +62,13 @@ const start = async () => {
         });
 
         await app.register(userRoutes);
+
+        const adminEmail = process.env.ADMIN_EMAIL;
+        const adminPassword = process.env.ADMIN_PASSWORD;
+        if (adminEmail && adminPassword) {
+            const result = await ensureAdminUserUseCase.execute(adminEmail, adminPassword);
+            app.log.info(`Admin bootstrap (${adminEmail}): ${result}`);
+        }
 
         const port = Number(process.env.PORT) || 3000;
         await app.listen({ port, host: '0.0.0.0' });

@@ -13,6 +13,7 @@ import type {
   Product,
 } from '../domain/types';
 import { ApiError, catalogApi, inventoryApi, userApi } from '../services/api';
+import { DEMO_ADMIN } from '../config/demoAccounts';
 
 const DEMO_SEED_PRODUCTS: CreateProductInput[] = [
   {
@@ -121,20 +122,7 @@ export const CatalogPage: React.FC = () => {
     let adminToken = localStorage.getItem('microstore_jwt_token');
     if (!adminToken) {
       try {
-        await userApi.register({
-          name: 'Admin Seeder',
-          email: 'admin@microstore.io',
-          password: 'AdminPassword123',
-          role: 'ADMIN',
-        });
-      } catch {
-        // Ignore if already exists
-      }
-      try {
-        const loginRes = await userApi.login({
-          email: 'admin@microstore.io',
-          password: 'AdminPassword123',
-        });
+        const loginRes = await userApi.login(DEMO_ADMIN);
         adminToken = loginRes.data.tokenJwt;
       } catch {
         // Ignore

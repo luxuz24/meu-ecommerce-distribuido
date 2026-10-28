@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import type { ApiTelemetryRecord, Product } from '../domain/types';
 import { ApiError, catalogApi, inventoryApi, userApi } from '../services/api';
+import { DEMO_ADMIN } from '../config/demoAccounts';
 import { formatBRL } from './CatalogPage';
 
 export const AdminProductsPage: React.FC = () => {
@@ -247,23 +248,10 @@ export const AdminProductsPage: React.FC = () => {
                 type="button"
                 onClick={async () => {
                   try {
-                    await userApi.register({
-                      name: 'Admin Tester',
-                      email: 'admin@microstore.io',
-                      password: 'AdminPassword123',
-                      role: 'ADMIN',
-                    });
-                  } catch {
-                    // ignore if already registered
-                  }
-                  try {
-                    const res = await userApi.login({
-                      email: 'admin@microstore.io',
-                      password: 'AdminPassword123',
-                    });
+                    const res = await userApi.login(DEMO_ADMIN);
                     saveSession(res.data.tokenJwt, res.data.user, res.telemetry);
                     setFormSuccess(
-                      'Sessão ADMIN autenticada (admin@microstore.io)! Mutações liberadas.'
+                      `Sessão ADMIN autenticada (${DEMO_ADMIN.email})! Mutações liberadas.`
                     );
                   } catch {
                     setFormError('Erro ao autenticar sessão Admin automática.');
@@ -274,7 +262,7 @@ export const AdminProductsPage: React.FC = () => {
                 <span className="material-symbols-outlined text-[14px]">
                   key
                 </span>
-                <span>Gerar Token ADMIN</span>
+                <span>Entrar como ADMIN demo</span>
               </button>
             )}
           </div>

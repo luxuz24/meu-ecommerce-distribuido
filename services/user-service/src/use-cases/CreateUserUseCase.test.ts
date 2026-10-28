@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { EnsureAdminUserUseCase } from './EnsureAdminUserUseCase.js';
 import { CreateUserUseCase } from './CreateUserUseCase.js';
 import { User } from '../domain/entities/User.js';
 import type { IUserRepository, CreateUserData, CreateOutboxData } from '../domain/repositories/IUserRepository.js';
@@ -80,5 +81,33 @@ describe('CreateUserUseCase', () => {
 
     await expect(useCase.execute('Lucas Ortiz', 'lucas@example.com', 'password123'))
       .rejects.toBeInstanceOf(UserAlreadyExistsError);
+  });
+});
+
+describe('EnsureAdminUserUseCase', () => {
+  it('should provision the ADMIN once and be idempotent on later boots', async () => {
+    const userRepository = new InMemoryUserRepository();
+    const createUser = new CreateUserUseCase(userRepository, new FakePasswordHasher());
+    const ensureAdmin = new EnsureAdminUserUseCase(userRepository, createUser);
+
+    expect(await ensureAdmin.execute('admin@demo.com', 'Secret123!')).toBe('created');
+    expect(await ensureAdmin.execute('admin@demo.com', 'Secret123!')).toBe('exists');
+
+    const admin = await userRepository.findByEmail('admin@demo.com');
+    expect(admin?.role).toBe('ADMIN');
+  });
+
+  it('should never promote an existing CUSTOMER account', async () => {
+    const userRepository = new InMemoryUserRepository();
+    const createUser = new CreateUserUseCase(userRepository, new FakePasswordHasher());
+    await createUser.execute('Squatter', 'admin@demo.com', 'Pass123!');
+
+    const result = await new EnsureAdminUserUseCase(userRepository, createUser).execute(
+      'admin@demo.com',
+      'Secret123!'
+    );
+
+    expect(result).toBe('exists');
+    expect((await userRepository.findByEmail('admin@demo.com'))?.role).toBe('CUSTOMER');
   });
 });
