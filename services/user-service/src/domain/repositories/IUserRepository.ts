@@ -1,9 +1,10 @@
-import { type User } from '../entities/User.js';
+import { type User, type UserRole } from '../entities/User.js';
 
 export interface CreateUserData {
   name: string;
   email: string;
   passwordHash: string;
+  role?: UserRole;
 }
 
 export interface CreateOutboxData {

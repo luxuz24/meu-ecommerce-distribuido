@@ -4,11 +4,13 @@ import {
   EndpointBar,
   JsonInspectorDrawer,
 } from '../components/telemetry/DevTelemetry';
+import { useAuth } from '../context/AuthContext';
 import type { ApiTelemetryRecord, Product } from '../domain/types';
-import { ApiError, catalogApi } from '../services/api';
+import { ApiError, catalogApi, userApi } from '../services/api';
 import { formatBRL } from './CatalogPage';
 
 export const AdminProductsPage: React.FC = () => {
+  const { user, saveSession } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -212,12 +214,51 @@ export const AdminProductsPage: React.FC = () => {
             </div>
             <div className="inline-flex items-center gap-1 bg-surface-container-lowest px-2 py-1 rounded-lg shadow-sm whitespace-nowrap">
               <span className="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">
-                MUTATIONS:
+                JWT ROLE:
               </span>
-              <span className="font-code-sm text-code-sm text-primary font-medium">
-                POST, PATCH, DELETE
+              <span
+                className={`font-code-sm text-code-sm font-semibold ${
+                  user?.role === 'ADMIN' ? 'text-tertiary' : 'text-error'
+                }`}
+              >
+                {user?.role || 'NÃO AUTENTICADO'}
               </span>
             </div>
+            {user?.role !== 'ADMIN' && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await userApi.register({
+                      name: 'Admin Tester',
+                      email: 'admin@microstore.io',
+                      password: 'AdminPassword123',
+                      role: 'ADMIN',
+                    });
+                  } catch {
+                    // ignore if already registered
+                  }
+                  try {
+                    const res = await userApi.login({
+                      email: 'admin@microstore.io',
+                      password: 'AdminPassword123',
+                    });
+                    saveSession(res.data.tokenJwt, res.data.user, res.telemetry);
+                    setFormSuccess(
+                      'Sessão ADMIN autenticada (admin@microstore.io)! Mutações liberadas.'
+                    );
+                  } catch {
+                    setFormError('Erro ao autenticar sessão Admin automática.');
+                  }
+                }}
+                className="inline-flex items-center gap-1 bg-primary text-on-primary px-2.5 py-1 rounded-lg font-code-sm text-code-sm font-semibold shadow-sm whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  key
+                </span>
+                <span>Gerar Token ADMIN</span>
+              </button>
+            )}
           </div>
         </section>
       </DevOnly>

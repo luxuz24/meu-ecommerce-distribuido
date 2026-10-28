@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import jwt from 'jsonwebtoken';
 import { Product } from '../domain/entities/Product.js';
+import { verifyCatalogJwt } from '../infra/http/middlewares/AuthMiddleware.js';
 import {
   type IProductRepository,
   type CreateProductDTO,
@@ -271,5 +273,31 @@ describe('GetProductById, UpdateProduct & DeleteProduct UseCases', () => {
     await expect(deleteUseCase.execute('non-existent')).rejects.toBeInstanceOf(
       ProductNotFoundError
     );
+  });
+});
+
+describe('Catalog JWT & Admin Authorization', () => {
+  const testSecret = 'test_secret_hs256_catalog';
+
+  it('should decode a valid HS256 JWT token with ADMIN role', () => {
+    const token = jwt.sign(
+      { userId: 'u-1', email: 'admin@microstore.io', role: 'ADMIN' },
+      testSecret,
+      { algorithm: 'HS256', expiresIn: '1h' }
+    );
+
+    const payload = verifyCatalogJwt(token, testSecret);
+    expect(payload.userId).toBe('u-1');
+    expect(payload.role).toBe('ADMIN');
+  });
+
+  it('should reject a token signed with wrong secret', () => {
+    const token = jwt.sign(
+      { userId: 'u-1', email: 'admin@microstore.io', role: 'ADMIN' },
+      'wrong_secret',
+      { algorithm: 'HS256' }
+    );
+
+    expect(() => verifyCatalogJwt(token, testSecret)).toThrow();
   });
 });

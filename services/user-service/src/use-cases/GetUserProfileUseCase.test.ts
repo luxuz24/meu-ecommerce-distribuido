@@ -21,6 +21,7 @@ class InMemoryUserRepository implements IUserRepository {
       name: data.name,
       email: data.email,
       password: data.passwordHash,
+      role: data.role ?? 'CUSTOMER',
       createdAt: new Date(),
     });
     this.users.push(user);
@@ -29,13 +30,14 @@ class InMemoryUserRepository implements IUserRepository {
 }
 
 describe('GetUserProfileUseCase', () => {
-  it('should return user profile without password when user exists', async () => {
+  it('should return user profile with role and without password when user exists', async () => {
     const userRepository = new InMemoryUserRepository();
     userRepository.users.push(new User({
       id: 'user-uuid-789',
       name: 'João Santos',
       email: 'joao@example.com',
       password: 'hashedpassword',
+      role: 'ADMIN',
       createdAt: new Date(),
     }));
 
@@ -46,6 +48,7 @@ describe('GetUserProfileUseCase', () => {
       id: 'user-uuid-789',
       name: 'João Santos',
       email: 'joao@example.com',
+      role: 'ADMIN',
     });
     expect((result as any).password).toBeUndefined();
   });

@@ -1,3 +1,4 @@
+import { type UserRole } from '../domain/entities/User.js';
 import { type IUserRepository } from '../domain/repositories/IUserRepository.js';
 import { UserNotFoundError } from '../domain/errors/UserNotFoundError.js';
 
@@ -5,6 +6,7 @@ export interface UserProfileResponse {
   id: string;
   name: string;
   email: string;
+  role: UserRole;
 }
 
 export class GetUserProfileUseCase {
@@ -21,6 +23,7 @@ export class GetUserProfileUseCase {
       id: user.id,
       name: user.name,
       email: user.email,
+      role: user.role,
     };
   }
 }

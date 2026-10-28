@@ -23,6 +23,7 @@ class InMemoryUserRepository implements IUserRepository {
       name: data.name,
       email: data.email,
       password: data.passwordHash,
+      role: data.role ?? 'CUSTOMER',
       createdAt: new Date(),
     });
     this.users.push(user);
@@ -42,19 +43,20 @@ class FakePasswordHasher implements IPasswordHasher {
 
 class FakeTokenService implements ITokenService {
   generateToken(payload: TokenPayload): string {
-    return `mock_token_for_${payload.userId}`;
+    return `mock_token_for_${payload.userId}_${payload.role}`;
   }
 
   verifyToken(token: string): TokenPayload {
     return {
       userId: token.replace('mock_token_for_', ''),
       email: 'test@example.com',
+      role: 'CUSTOMER',
     };
   }
 }
 
 describe('LoginUserUseCase', () => {
-  it('should authenticate user and return tokenJwt with user data', async () => {
+  it('should authenticate user and return tokenJwt with user data and role', async () => {
     const userRepository = new InMemoryUserRepository();
     const passwordHasher = new FakePasswordHasher();
     const tokenService = new FakeTokenService();
@@ -65,6 +67,7 @@ describe('LoginUserUseCase', () => {
       name: 'Maria Silva',
       email: 'maria@example.com',
       password: hashedPassword,
+      role: 'ADMIN',
       createdAt: new Date(),
     }));
 
@@ -74,11 +77,12 @@ describe('LoginUserUseCase', () => {
       password: 'password123',
     });
 
-    expect(result.tokenJwt).toBe('mock_token_for_user-uuid-456');
+    expect(result.tokenJwt).toBe('mock_token_for_user-uuid-456_ADMIN');
     expect(result.user).toEqual({
       id: 'user-uuid-456',
       name: 'Maria Silva',
       email: 'maria@example.com',
+      role: 'ADMIN',
     });
   });
 

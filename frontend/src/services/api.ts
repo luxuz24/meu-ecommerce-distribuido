@@ -110,7 +110,12 @@ export const userApi = {
       '/health'
     ),
 
-  register: (payload: { name: string; email: string; password: string }) =>
+  register: (payload: {
+    name: string;
+    email: string;
+    password: string;
+    role?: 'CUSTOMER' | 'ADMIN';
+  }) =>
     requestWithTelemetry<User>('user-service:3000', USER_API_URL, 'POST', '/users', {
       body: payload,
     }),
@@ -170,29 +175,54 @@ export const catalogApi = {
       `/api/products/${id}`
     ),
 
-  createProduct: (payload: CreateProductInput) =>
+  createProduct: (payload: CreateProductInput, token?: string | null) =>
     requestWithTelemetry<Product>(
       'catalog-service:3001',
       CATALOG_API_URL,
       'POST',
       '/api/products',
-      { body: payload }
+      {
+        body: payload,
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
     ),
 
-  updateProduct: (id: string, payload: UpdateProductInput) =>
+  updateProduct: (
+    id: string,
+    payload: UpdateProductInput,
+    token?: string | null
+  ) =>
     requestWithTelemetry<Product>(
       'catalog-service:3001',
       CATALOG_API_URL,
       'PATCH',
       `/api/products/${id}`,
-      { body: payload }
+      {
+        body: payload,
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
     ),
 
-  deleteProduct: (id: string) =>
+  deleteProduct: (id: string, token?: string | null) =>
     requestWithTelemetry<null>(
       'catalog-service:3001',
       CATALOG_API_URL,
       'DELETE',
-      `/api/products/${id}`
+      `/api/products/${id}`,
+      {
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
     ),
 };
