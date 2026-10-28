@@ -63,6 +63,33 @@ export interface ReserveStockResponse {
   reason?: string;
 }
 
+export type OrderStatus = 'PENDING' | 'STOCK_RESERVED' | 'PAID' | 'CANCELLED';
+
+export interface OrderItem {
+  id?: string;
+  productId: string;
+  sku: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  status: OrderStatus;
+  items: OrderItem[];
+  total: number;
+  cancelReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
 export interface ApiTelemetryRecord {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   endpoint: string;

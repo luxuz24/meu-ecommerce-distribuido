@@ -5,13 +5,14 @@ import {
   EndpointBar,
   JsonInspectorDrawer,
 } from '../components/telemetry/DevTelemetry';
+import { useCart } from '../context/CartContext';
 import type {
   ApiTelemetryRecord,
   CreateProductInput,
   PaginatedProducts,
   Product,
 } from '../domain/types';
-import { ApiError, catalogApi, userApi } from '../services/api';
+import { ApiError, catalogApi, inventoryApi, userApi } from '../services/api';
 
 const DEMO_SEED_PRODUCTS: CreateProductInput[] = [
   {
@@ -56,6 +57,7 @@ export function formatBRL(value: number): string {
 }
 
 export const CatalogPage: React.FC = () => {
+  const { addItem } = useCart();
   const [data, setData] = useState<PaginatedProducts>({
     items: [],
     total: 0,
@@ -141,7 +143,15 @@ export const CatalogPage: React.FC = () => {
 
     for (const item of DEMO_SEED_PRODUCTS) {
       try {
-        await catalogApi.createProduct(item, adminToken);
+        const created = await catalogApi.createProduct(item, adminToken);
+        await inventoryApi.seedStock(
+          {
+            productId: created.data.id,
+            sku: created.data.sku,
+            availableQty: item.stock,
+          },
+          adminToken
+        );
       } catch {
         // Ignora caso o SKU já exista no banco
       }
@@ -479,6 +489,7 @@ export const CatalogPage: React.FC = () => {
                         type="button"
                         disabled={isOutOfStock || !product.isActive}
                         onClick={() => {
+                          addItem(product, 1);
                           setAddedId(product.id);
                           setTimeout(() => setAddedId(null), 1500);
                         }}

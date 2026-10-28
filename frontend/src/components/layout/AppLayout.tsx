@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import { useTelemetry } from '../../context/TelemetryContext';
 import { DevOnly } from '../telemetry/DevTelemetry';
 
@@ -9,6 +10,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const location = useLocation();
   const { user } = useAuth();
+  const { totalItems } = useCart();
   const {
     isDevMode,
     toggleDevMode,
@@ -18,6 +20,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
 
   const currentSectionLabel = () => {
     if (location.pathname.startsWith('/admin')) return 'Admin Products';
+    if (location.pathname.startsWith('/orders')) return 'Pedidos & Saga';
     if (location.pathname.startsWith('/auth')) return 'Auth Cluster';
     if (location.pathname.startsWith('/profile')) return 'Meu Perfil';
     if (location.pathname.startsWith('/products/')) return 'Detalhe do Produto';
@@ -60,6 +63,21 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
                   }`}
                 >
                   Catálogo
+                </Link>
+                <Link
+                  to="/orders"
+                  className={`px-3 py-1.5 rounded-lg font-label-md text-label-md transition-colors flex items-center gap-1.5 ${
+                    location.pathname.startsWith('/orders')
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container'
+                  }`}
+                >
+                  <span>Pedidos</span>
+                  {totalItems > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-tertiary text-on-tertiary font-code-sm text-code-sm">
+                      {totalItems}
+                    </span>
+                  )}
                 </Link>
                 <Link
                   to="/admin/products"
@@ -189,6 +207,25 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
               inventory_2
             </span>
             <span className="font-label-md text-label-md mt-0.5">Catálogo</span>
+          </Link>
+
+          <Link
+            to="/orders"
+            className={`relative flex flex-col items-center justify-center min-w-[64px] min-h-[44px] transition-colors ${
+              location.pathname.startsWith('/orders')
+                ? 'text-primary font-semibold'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[22px]">
+              shopping_bag
+            </span>
+            {totalItems > 0 && (
+              <span className="absolute top-1 right-2 px-1.5 rounded-full bg-tertiary text-on-tertiary font-code-sm text-[10px]">
+                {totalItems}
+              </span>
+            )}
+            <span className="font-label-md text-label-md mt-0.5">Pedidos</span>
           </Link>
 
           <Link

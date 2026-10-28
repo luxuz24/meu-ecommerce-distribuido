@@ -137,6 +137,28 @@ services:
       rabbitmq:
         condition: service_started
 
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    restart: unless-stopped
+    ports:
+      - "${ORDER_PORT:-3004}:${ORDER_PORT:-3004}"
+    environment:
+      - PORT=${ORDER_PORT:-3004}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/order_db?schema=public
+      - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+    networks:
+      - ecom_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
   api-gateway:
     image: nginx:1.27-alpine
     container_name: ecom_api_gateway
@@ -151,6 +173,7 @@ services:
       - user-service
       - catalog-service
       - inventory-service
+      - order-service
 
   frontend:
     build:

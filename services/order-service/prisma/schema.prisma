@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  userId       String
+  status       String      @default("PENDING")
+  total        Float
+  cancelReason String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  items        OrderItem[]
+
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  productId String
+  sku       String
+  name      String
+  price     Float
+  quantity  Int
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Outbox {
+  id            String   @id @default(uuid())
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json
+  published     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@map("outbox")
+}
+
+model ProcessedMessage {
+  messageId   String   @id
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@map("processed_messages")
+}
