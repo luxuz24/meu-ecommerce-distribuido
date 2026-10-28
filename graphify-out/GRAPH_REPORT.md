@@ -1,17 +1,17 @@
 # Graph Report - ecommerce_micro  (2026-10-28)
 
 ## Corpus Check
-- 153 files · ~40,418 words
+- 155 files · ~43,385 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 43 file(s) not represented in the graph (top: (none) 24, .example 9, .toml 4)
 
 ## Summary
-- 1376 nodes · 2497 edges · 80 communities (65 shown, 15 thin omitted)
+- 1385 nodes · 2510 edges · 81 communities (65 shown, 16 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 103 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `73367f47`
+- Built from commit: `9905b342`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,7 +32,7 @@
 - devDependencies
 - compilerOptions
 - postgres
-- Meu E-Commerce Distribuído 🛒⚡
+- MicroStore — Living Architecture & Showcase de Microsserviços 🛒⚡
 - dependencies
 - compilerOptions
 - compilerOptions
@@ -89,12 +89,13 @@
 - LoginUseCase.test.ts
 - User.ts
 - FakePasswordHasher
+- seed-demo.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `Product` - 26 edges
 2. `User` - 25 edges
-3. `Order` - 24 edges
-4. `scripts` - 23 edges
+3. `scripts` - 24 edges
+4. `Order` - 24 edges
 5. `InventoryItem` - 23 edges
 6. `IProductRepository` - 22 edges
 7. `IUserRepository` - 22 edges
@@ -117,7 +118,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (80 total, 15 thin omitted)
+## Communities (81 total, 16 thin omitted)
 
 ### Community 0 - "User"
 Cohesion: 0.18
@@ -128,8 +129,8 @@ Cohesion: 0.07
 Nodes (28): Product, ProductProps, InvalidProductDataError, ProductAlreadyExistsError, ProductNotFoundError, CreateProductDTO, IProductRepository, ListProductsParams (+20 more)
 
 ### Community 2 - "CatalogPage.tsx"
-Cohesion: 0.09
-Nodes (64): dependencies, react@^19.0.0, react-dom@^19.0.0, react-router-dom@^7.1.5, App(), AppLayout(), DevOnly(), EndpointBar() (+56 more)
+Cohesion: 0.08
+Nodes (68): dependencies, react@^19.0.0, react-dom@^19.0.0, react-router-dom@^7.1.5, App(), AppLayout(), DevOnly(), EndpointBar() (+60 more)
 
 ### Community 3 - "ref_fastify"
 Cohesion: 0.09
@@ -165,7 +166,7 @@ Nodes (19): compilerOptions, declaration, declarationMap, exactOptionalPropertyT
 
 ### Community 11 - "scripts"
 Cohesion: 0.07
-Nodes (27): description, name, private, scripts, build, build:catalog, build:frontend, build:inventory (+19 more)
+Nodes (28): description, name, private, scripts, build, build:catalog, build:frontend, build:inventory (+20 more)
 
 ### Community 12 - "compilerOptions"
 Cohesion: 0.11
@@ -183,9 +184,9 @@ Nodes (16): compilerOptions, exactOptionalPropertyTypes, isolatedModules, module
 Cohesion: 0.12
 Nodes (16): POSTGRES_DB, POSTGRES_PASSWORD, POSTGRES_USER, interval, retries, test, timeout, container_name (+8 more)
 
-### Community 16 - "Meu E-Commerce Distribuído 🛒⚡"
-Cohesion: 0.13
-Nodes (14): 1. Health Checks, 1. Subir tudo com Docker Compose (Recomendado), 2. Criar Usuário (Dispara Outbox + RabbitMQ + Notificação), 2. Rodar Serviços Localmente (Modo Desenvolvimento), 3. Login e Obtenção do Token JWT, 4. Consultar Perfil Autenticado (`/users/me`), 5. Cadastrar Produto no Catálogo (MongoDB), 📊 Acesso aos Painéis Administrativos (+6 more)
+### Community 16 - "MicroStore — Living Architecture & Showcase de Microsserviços 🛒⚡"
+Cohesion: 0.14
+Nodes (13): 1. Clonar e Iniciar Tudo, 2. Popular o Banco com Dados de Demonstração, 🚀 Como Executar o Projeto, ⚡ Como Funciona a Saga Coreografada (Passo a Passo), MicroStore — Living Architecture & Showcase de Microsserviços 🛒⚡, 🧭 O que este projeto demonstra?, 👥 Orquestração Multi-Agente, 🧩 Os 5 Microsserviços e suas Responsabilidades (+5 more)
 
 ### Community 17 - "dependencies"
 Cohesion: 0.13
@@ -212,7 +213,7 @@ Cohesion: 0.22
 Nodes (8): driver, networks, ecom_network, services, volumes, mongo_data, pg_data, rabbitmq_data
 
 ### Community 23 - "ref_fastify"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (28): mongoose, productController, connectDB(), CatalogTokenPayload, requireAdminAuth(), verifyCatalogJwt(), productRoutes(), app (+20 more)
 
 ### Community 25 - "03 — Convenções e Regras para Agentes"
@@ -380,22 +381,22 @@ Cohesion: 0.26
 Nodes (7): UserProps, UserRole, UserNotFoundError, CreateUserResponse, GetUserProfileUseCase, UserProfileResponse, LoginUserResponse
 
 ## Knowledge Gaps
-- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `mongoose` connect `ref_fastify` to `CreateProductUseCase.test.ts`, `catalog-service/package.json`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+- **Why does `2. SOLID aplicado ao projeto` connect `IUserRepository` to `3. Segurança (obrigatório)`, `CreateProductUseCase.test.ts`?**
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `InventoryItem` (e.g. with `Fase 4 — Novos serviços (bancos já provisionados)` and `Tarefa A — Fase 4.1: Microsserviço de Estoque (`inventory-service` + `inventory_db`)`) actually correct?**
   _`InventoryItem` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **Should `CreateProductUseCase.test.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.07136404697380307 - nodes in this community are weakly interconnected._
-- **Why does `2. SOLID aplicado ao projeto` connect `IUserRepository` to `3. Segurança (obrigatório)`, `CreateProductUseCase.test.ts`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+- **Why does `06 — Fluxo de Trabalho, SOLID e Segurança para Agentes` connect `3. Segurança (obrigatório)` to `IUserRepository`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **Should `CatalogPage.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.08732309545317675 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07992515370221866 - nodes in this community are weakly interconnected._
 - **Why does `bcrypt` connect `bcrypt` to `user-service/src/infra/container.ts`, `user-service/package.json`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
 - **Should `ref_fastify` be split into smaller, more focused modules?**
   _Cohesion score 0.09351432880844646 - nodes in this community are weakly interconnected._

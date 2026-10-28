@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { TelemetryProvider } from './context/TelemetryContext';
 import { AdminProductsPage } from './pages/AdminProductsPage';
+import { ArchitectureShowcasePage } from './pages/ArchitectureShowcasePage';
 import { AuthPage } from './pages/AuthPage';
 import { CatalogPage } from './pages/CatalogPage';
 import { OrdersPage } from './pages/OrdersPage';
@@ -22,6 +23,7 @@ export const App: React.FC = () => {
                 <Route path="/" element={<CatalogPage />} />
                 <Route path="/products/:id" element={<ProductDetailPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/architecture" element={<ArchitectureShowcasePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/login" element={<Navigate to="/auth" replace />} />
                 <Route
