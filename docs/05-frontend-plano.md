@@ -19,9 +19,9 @@ SPA/SSR loja virtual que consome user-service e catalog-service (e, depois, orde
 | F1 | Cadastro (`POST /users`), login (`POST /login`), logout, página de perfil (`GET /users/me`) | CORS | ✅ |
 | F2 | Catálogo: listagem paginada, busca (`?q=`), filtros e detalhe (`GET /api/products/:id`) | `GET /api/products` | ✅ |
 | F3 | Admin: CRUD de produtos (`POST`, `PATCH`, `DELETE` soft delete + reativação) | `catalog-service` CRUD | ✅ (proteção JWT admin na Fase 3 backend) |
-| F4 | Carrinho (cliente) e checkout | order-service | ⬜ |
-| F5 | Meus pedidos, status de pagamento (polling/SSE) | order/payment | ⬜ |
-| F6 | Notificações em tempo real (opcional), E2E, CI | notification evolução | ⬜ |
+| F4 | Carrinho (cliente) e checkout | order-service | ✅ (CartContext + POST /api/orders na OrdersPage) |
+| F5 | Meus pedidos, status de pagamento (polling/SSE/manual refresh) | order/payment | ✅ (OrdersPage + status da Saga e controles) |
+| F6 | Notificações em tempo real (opcional), E2E, CI | notification evolução | ✅ (Notification consumer + CI matrix) |
 
 ## Regras
 - Tipos/contratos espelham `04-contratos-api-e-eventos.md`; atualizar ambos juntos.

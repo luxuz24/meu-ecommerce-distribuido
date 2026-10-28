@@ -81,7 +81,10 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ CI (GitHub Actions): build, lint, test, docker build (todos os 8 componentes na matriz)
 
 ### Fase 6 — Frontend (paralelo às fases 2–4)
-Ver [05-frontend-plano.md](./05-frontend-plano.md).
+- ✅ **F0 a F3**: Scaffold, autenticação JWT, catálogo com busca e filtros, painel Admin CRUD com soft delete
+- ✅ **F4 & F5**: Carrinho de Compras persistente (`CartContext`), Checkout transacional (`POST /api/orders`) e tela **Meus Pedidos** (`/orders`) com status visual da Saga Coreografada
+- ✅ **Telemetria Limpa**: Toggle instantâneo entre **Modo Telemetria Dev** e **Modo Loja Limpa** (`<DevOnly>`) no topo da página
+Ver detalhes em [05-frontend-plano.md](./05-frontend-plano.md).
 
 ## C. Ordem sugerida de execução
 1. Fase 0 → 2. Fase 1 e Fase 2 (paralelas) → 3. Fase 6 (MVP: cadastro/login/catálogo) → 4. Fase 3 → 5. Fase 4 → 6. Fase 5 → 7. Frontend de pedidos/pagamento.
