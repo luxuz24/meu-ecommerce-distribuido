@@ -56,190 +56,202 @@ export class PrismaInventoryRepository implements IInventoryRepository {
   }
 
   async reserveOrderStockWithOutbox(input: ReserveOrderInput): Promise<ReserveOrderResult> {
-    return this.prisma.$transaction(async (tx) => {
-      if (input.messageId) {
-        const alreadyProcessed = await tx.processedMessage.findUnique({
-          where: { messageId: input.messageId },
-        });
-        if (alreadyProcessed) {
-          return {
-            status: 'ALREADY_PROCESSED',
-            orderId: input.orderId,
-          };
-        }
-      }
-
-      const existingReservation = await tx.stockReservation.findUnique({
-        where: { orderId: input.orderId },
-      });
-      if (existingReservation) {
-        return {
-          status: 'ALREADY_PROCESSED',
-          orderId: input.orderId,
-        };
-      }
-
-      // Check availability for all items first
-      for (const reqItem of input.items) {
-        const stockRow = await tx.inventoryItem.findUnique({
-          where: { sku: reqItem.sku },
-        });
-
-        if (!stockRow || stockRow.availableQty < reqItem.quantity) {
-          const reason = !stockRow
-            ? `SKU_NOT_FOUND:${reqItem.sku}`
-            : `INSUFFICIENT_STOCK:${reqItem.sku}`;
-
-          if (input.messageId) {
-            await tx.processedMessage.create({
-              data: {
-                messageId: input.messageId,
-                eventType: 'ORDER_CREATED',
-              },
-            });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (input.messageId) {
+          const alreadyProcessed = await tx.processedMessage.findUnique({
+            where: { messageId: input.messageId },
+          });
+          if (alreadyProcessed) {
+            return { status: 'ALREADY_PROCESSED', orderId: input.orderId };
           }
+        }
 
-          await tx.outbox.create({
+        const existingReservation = await tx.stockReservation.findUnique({
+          where: { orderId: input.orderId },
+        });
+        if (existingReservation) {
+          return { status: 'ALREADY_PROCESSED', orderId: input.orderId };
+        }
+
+        // Decremento condicional e atômico: o próprio UPDATE garante availableQty >= quantity.
+        // Sem "ler e depois gravar", duas reservas concorrentes nunca disputam o mesmo saldo.
+        for (const reqItem of input.items) {
+          const { count } = await tx.inventoryItem.updateMany({
+            where: { sku: reqItem.sku, availableQty: { gte: reqItem.quantity } },
             data: {
-              aggregateType: 'Inventory',
-              aggregateId: input.orderId,
-              eventType: 'STOCK_REJECTED',
-              payload: {
-                orderId: input.orderId,
-                reason,
-                items: input.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
-              },
+              availableQty: { decrement: reqItem.quantity },
+              reservedQty: { increment: reqItem.quantity },
             },
           });
-
-          return {
-            status: 'STOCK_REJECTED',
-            orderId: input.orderId,
-            reason,
-          };
+          if (count === 0) {
+            // Aborta a transação inteira: decrementos de itens anteriores sofrem rollback
+            throw new StockShortage(reqItem.sku);
+          }
         }
-      }
 
-      // Deduct availableQty and increment reservedQty for each item
-      for (const reqItem of input.items) {
-        await tx.inventoryItem.update({
-          where: { sku: reqItem.sku },
+        const reservationRow = await tx.stockReservation.create({
           data: {
-            availableQty: { decrement: reqItem.quantity },
-            reservedQty: { increment: reqItem.quantity },
-          },
-        });
-      }
-
-      const reservationRow = await tx.stockReservation.create({
-        data: {
-          orderId: input.orderId,
-          status: 'RESERVED',
-          items: input.items as unknown as object,
-        },
-      });
-
-      if (input.messageId) {
-        await tx.processedMessage.create({
-          data: {
-            messageId: input.messageId,
-            eventType: 'ORDER_CREATED',
-          },
-        });
-      }
-
-      await tx.outbox.create({
-        data: {
-          aggregateType: 'Inventory',
-          aggregateId: input.orderId,
-          eventType: 'STOCK_RESERVED',
-          payload: {
             orderId: input.orderId,
-            reservationId: reservationRow.id,
-            ...(input.userId !== undefined ? { userId: input.userId } : {}),
-            ...(input.total !== undefined ? { total: input.total } : {}),
-            ...(input.simulateOutcome !== undefined
-              ? { simulateOutcome: input.simulateOutcome }
-              : {}),
-            items: input.items.map((i) => ({
-              sku: i.sku,
-              quantity: i.quantity,
-              ...(i.price !== undefined ? { price: i.price } : {}),
-              ...(i.name !== undefined ? { name: i.name } : {}),
-            })),
+            status: 'RESERVED',
+            items: input.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
           },
-        },
-      });
+        });
 
-      return {
-        status: 'STOCK_RESERVED',
-        orderId: input.orderId,
-        reservation: new StockReservation({
-          id: reservationRow.id,
-          orderId: reservationRow.orderId,
-          status: reservationRow.status as ReservationStatus,
-          items: reservationRow.items as unknown as ReservationItemEntry[],
-          createdAt: reservationRow.createdAt,
-        }),
-      };
-    });
+        if (input.messageId) {
+          await tx.processedMessage.create({
+            data: { messageId: input.messageId, eventType: 'ORDER_CREATED' },
+          });
+        }
+
+        await tx.outbox.create({
+          data: {
+            aggregateType: 'Inventory',
+            aggregateId: input.orderId,
+            eventType: 'STOCK_RESERVED',
+            payload: {
+              orderId: input.orderId,
+              reservationId: reservationRow.id,
+              ...(input.userId !== undefined ? { userId: input.userId } : {}),
+              ...(input.total !== undefined ? { total: input.total } : {}),
+              ...(input.simulateOutcome !== undefined
+                ? { simulateOutcome: input.simulateOutcome }
+                : {}),
+              items: input.items.map((i) => ({
+                sku: i.sku,
+                quantity: i.quantity,
+                ...(i.price !== undefined ? { price: i.price } : {}),
+                ...(i.name !== undefined ? { name: i.name } : {}),
+              })),
+            },
+          },
+        });
+
+        return {
+          status: 'STOCK_RESERVED',
+          orderId: input.orderId,
+          reservation: new StockReservation({
+            id: reservationRow.id,
+            orderId: reservationRow.orderId,
+            status: reservationRow.status as ReservationStatus,
+            items: reservationRow.items as unknown as ReservationItemEntry[],
+            createdAt: reservationRow.createdAt,
+          }),
+        };
+      });
+    } catch (err) {
+      if (err instanceof StockShortage) {
+        return this.recordRejection(input, err.sku);
+      }
+      // Mesma mensagem/pedido processado em paralelo por outro consumer: a outra transação venceu
+      if (isUniqueViolation(err)) {
+        return { status: 'ALREADY_PROCESSED', orderId: input.orderId };
+      }
+      throw err;
+    }
+  }
+
+  private async recordRejection(input: ReserveOrderInput, sku: string): Promise<ReserveOrderResult> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const stockRow = await tx.inventoryItem.findUnique({ where: { sku } });
+        const reason = stockRow ? `INSUFFICIENT_STOCK:${sku}` : `SKU_NOT_FOUND:${sku}`;
+
+        if (input.messageId) {
+          await tx.processedMessage.create({
+            data: { messageId: input.messageId, eventType: 'ORDER_CREATED' },
+          });
+        }
+
+        await tx.outbox.create({
+          data: {
+            aggregateType: 'Inventory',
+            aggregateId: input.orderId,
+            eventType: 'STOCK_REJECTED',
+            payload: {
+              orderId: input.orderId,
+              reason,
+              items: input.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
+            },
+          },
+        });
+
+        return { status: 'STOCK_REJECTED' as const, orderId: input.orderId, reason };
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return { status: 'ALREADY_PROCESSED', orderId: input.orderId };
+      }
+      throw err;
+    }
   }
 
   async releaseOrderReservationWithOutbox(orderId: string, messageId?: string): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
-      if (messageId) {
-        const alreadyProcessed = await tx.processedMessage.findUnique({
-          where: { messageId },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (messageId) {
+          const alreadyProcessed = await tx.processedMessage.findUnique({
+            where: { messageId },
+          });
+          if (alreadyProcessed) return false;
+        }
+
+        // Transição condicional RESERVED -> RELEASED: só uma compensação concorrente vence
+        const { count } = await tx.stockReservation.updateMany({
+          where: { orderId, status: 'RESERVED' },
+          data: { status: 'RELEASED' },
         });
-        if (alreadyProcessed) return false;
-      }
+        if (count === 0) return false;
 
-      const reservation = await tx.stockReservation.findUnique({
-        where: { orderId },
-      });
+        const reservation = await tx.stockReservation.findUniqueOrThrow({ where: { orderId } });
+        const items = reservation.items as unknown as ReservationItemEntry[];
+        for (const item of items) {
+          await tx.inventoryItem.update({
+            where: { sku: item.sku },
+            data: {
+              availableQty: { increment: item.quantity },
+              reservedQty: { decrement: item.quantity },
+            },
+          });
+        }
 
-      if (!reservation || reservation.status !== 'RESERVED') {
-        return false;
-      }
+        if (messageId) {
+          await tx.processedMessage.create({
+            data: { messageId, eventType: 'PAYMENT_FAILED' },
+          });
+        }
 
-      const items = reservation.items as unknown as ReservationItemEntry[];
-      for (const item of items) {
-        await tx.inventoryItem.update({
-          where: { sku: item.sku },
+        await tx.outbox.create({
           data: {
-            availableQty: { increment: item.quantity },
-            reservedQty: { decrement: item.quantity },
+            aggregateType: 'Inventory',
+            aggregateId: orderId,
+            eventType: 'STOCK_RELEASED',
+            payload: {
+              orderId,
+              items: items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
+            },
           },
         });
-      }
 
-      await tx.stockReservation.update({
-        where: { orderId },
-        data: { status: 'RELEASED' },
+        return true;
       });
-
-      if (messageId) {
-        await tx.processedMessage.create({
-          data: {
-            messageId,
-            eventType: 'PAYMENT_FAILED',
-          },
-        });
-      }
-
-      await tx.outbox.create({
-        data: {
-          aggregateType: 'Inventory',
-          aggregateId: orderId,
-          eventType: 'STOCK_RELEASED',
-          payload: {
-            orderId,
-            items: items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
-          },
-        },
-      });
-
-      return true;
-    });
+    } catch (err) {
+      if (isUniqueViolation(err)) return false;
+      throw err;
+    }
   }
+}
+
+class StockShortage extends Error {
+  constructor(public readonly sku: string) {
+    super(`STOCK_SHORTAGE:${sku}`);
+  }
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { code?: unknown }).code === 'P2002'
+  );
 }

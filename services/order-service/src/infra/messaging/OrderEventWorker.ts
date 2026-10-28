@@ -31,6 +31,8 @@ export async function startOrderMessaging(
   try {
     const conn = await amqp.connect(rabbitUrl);
     const channel = await conn.createChannel();
+    // Backpressure: no máximo N mensagens não confirmadas em processamento simultâneo
+    await channel.prefetch(10);
     await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
     await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
 
