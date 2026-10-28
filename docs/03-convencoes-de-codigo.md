@@ -1,4 +1,4 @@
-# 03 — Convenções e Regras para Agentes
+# 03 — Convenções de Código
 
 ## Clean Architecture (obrigatório em código novo/refatorado)
 1. **Regra de dependência**: `infra → use-cases → domain`. Nunca o contrário.

@@ -1,150 +1,187 @@
-# MicroStore — Living Architecture & Showcase de Microsserviços 🛒⚡
+# MicroStore — Estudo de caso de microsserviços orientados a eventos 🛒⚡
 
-> Uma plataforma distribuída completa de e-commerce construída como um **caso de uso educacional e interativo** de como arquiteturas orientadas a eventos (EDA) e microsserviços modernos funcionam na prática.
+[![CI](https://github.com/luxuz24/meu-ecommerce-distribuido/actions/workflows/ci.yml/badge.svg)](https://github.com/luxuz24/meu-ecommerce-distribuido/actions/workflows/ci.yml)
+![Node 24](https://img.shields.io/badge/node-24-339933)
+![TypeScript](https://img.shields.io/badge/TypeScript-ESM-3178C6)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+
+Um e-commerce dividido em **5 microsserviços com banco próprio**, que fecham uma compra por uma
+**Saga coreografada** sobre RabbitMQ, sem chamadas HTTP em cadeia e sem transação distribuída.
+
+O objetivo é mostrar, rodando e testado, como resolver os problemas que aparecem quando um
+monólito vira um sistema distribuído:
+
+- como gravar no banco **e** publicar um evento sem perder nenhum dos dois;
+- como lidar com mensagens duplicadas;
+- como desfazer uma reserva quando o pagamento falha;
+- como impedir que dois pedidos simultâneos vendam a mesma unidade;
+- como seguir uma única compra através de quatro serviços.
+
+Cada uma dessas garantias tem um teste ponta a ponta que roda no CI contra a stack real.
 
 ---
 
-## 🧭 O que este projeto demonstra?
+## 🏛️ Arquitetura
 
-Diferente de um monólito tradicional, este sistema divide responsabilidades em **5 microsserviços autônomos**, cada um com seu banco de dados isolado (*Database per Service*), comunicação síncrona via **API Gateway Nginx** e orquestração assíncrona orientada a eventos usando **RabbitMQ**, **Saga Coreografada** e **Transactional Outbox Pattern**.
-
-Além da loja virtual completa no Frontend, a aplicação conta com o painel interativo **`/architecture` (Arquitetura Viva)** que explica visualmente cada decisão arquitetural, fluxo de compensação e padrão de resiliência.
-
----
-
-## 🏛️ Topologia do Ecossistema Distribuído
-
-```
-                                [ CLIENTE / BROWSER ]
-                                          │
-                 ┌────────────────────────┴────────────────────────┐
-                 │                                                 │
-        (Porta :3002)                                     (Porta :8080)
-┌──────────────────────────────┐                ┌───────────────────────────────────┐
-│     MicroStore Frontend      │                │         Nginx API Gateway         │
-│   (React 19 + TypeScript)    │                │  (Reverse Proxy / Rate Limiting)  │
-└──────────────────────────────┘                └─────────────────┬─────────────────┘
-                                                                  │
-       ┌──────────────────────────┬───────────────────────────────┼──────────────────────────────┬──────────────────────────┐
-       │                          │                               │                              │                          │
-       ▼                          ▼                               ▼                              ▼                          ▼
-┌──────────────┐          ┌──────────────┐                ┌──────────────┐               ┌──────────────┐           ┌──────────────┐
-│ User Service │          │Catalog Service│               │Inventory Srv │               │ Order Service│           │Payment Service│
-│ (Porta 3000) │          │ (Porta 3001) │                │ (Porta 3003) │               │ (Porta 3004) │           │ (Porta 3005) │
-└──────┬───────┘          └──────┬───────┘                └──────┬───────┘               └──────┬───────┘           └──────┬───────┘
-       │                         │                               │                              │                          │
-       ▼                         ▼                               ▼                              ▼                          ▼
- 💾 PostgreSQL              💾 MongoDB                     💾 PostgreSQL                  💾 PostgreSQL              💾 PostgreSQL
-   (user_db)               (catalog_db)                   (inventory_db)                    (order_db)                (payment_db)
-       │                                                         │                              │                          │
-       │ (Outbox Table)                                          │ (Transactional Events)       │ (Saga Events)            │ (Outbox Table)
-       ▼                                                         ▼                              ▼                          ▼
-┌──────────────┐                                         ┌────────────────────────────────────────────────────────────────────────┐
-│Outbox Worker │                                         │                     RabbitMQ Topic Exchange                            │
-└──────┬───────┘                                         │                       ('ecommerce_events')                             │
-       │                                                 └──────────────────────────────────┬─────────────────────────────────────┘
-       └────────────────────────────────────────────────────────────────────────────────────┘
-                                                                  │
-                                                                  ▼
-                                                 ┌──────────────────────────────────┐
-                                                 │       Notification Service       │
-                                                 │   (Simula e-mails + DLQ Ativa)   │
-                                                 └──────────────────────────────────┘
+```mermaid
+flowchart LR
+    B[Browser] --> F[Frontend :3002]
+    B -->|toda a API| G[Nginx API Gateway :8080]
+    G --> U[user-service] & C[catalog-service] & I[inventory-service] & O[order-service] & P[payment-service]
+    O -->|preço/SKU| C
+    U --- UDB[(user_db)]
+    C --- CDB[(catalog_db · Mongo)]
+    I --- IDB[(inventory_db)]
+    O --- ODB[(order_db)]
+    P --- PDB[(payment_db)]
+    UDB -.outbox.-> UOP[user-outbox-processor]
+    UOP & I & O & P <-->|ecommerce_events| R{{RabbitMQ}}
+    R --> N[notification-service]
 ```
 
+| Serviço | Banco | Responsabilidade | Papel na Saga |
+|---|---|---|---|
+| **user-service** | Postgres `user_db` | Cadastro, login JWT (HS256), RBAC `CUSTOMER`/`ADMIN` | — |
+| **catalog-service** | MongoDB `catalog_db` | Vitrine, busca textual, CRUD admin | Fonte de verdade do preço |
+| **order-service** | Postgres `order_db` | Ciclo de vida do pedido `PENDING → STOCK_RESERVED → PAID / CANCELLED` | Inicia a Saga e aplica o desfecho |
+| **inventory-service** | Postgres `inventory_db` | Reserva atômica, estorno e baixa definitiva | Participante + compensação |
+| **payment-service** | Postgres `payment_db` | Cobrança simulada com regra antifraude | Participante |
+| **notification-service** | — | Consome eventos e simula e-mails | Observador |
+
+Somente o **gateway (`:8080`)** e o **frontend (`:3002`)** são expostos no host. Os serviços só
+são alcançáveis pela rede interna, então rate limit, roteamento e rastreabilidade não podem ser
+contornados.
+
+## ⚡ A Saga de checkout
+
+1. **`order-service`** recebe `{productId, quantity}`, busca preço, nome e SKU no catálogo,
+   grava o pedido `PENDING` e o evento `ORDER_CREATED` na **outbox**, na mesma transação.
+2. **`inventory-service`** reserva o estoque com um `UPDATE` condicional e publica
+   `STOCK_RESERVED`. Se faltar saldo, publica `STOCK_REJECTED` e o pedido é cancelado sem cobrança.
+3. **`payment-service`** cobra o total calculado pelo servidor e publica `PAYMENT_APPROVED` ou
+   `PAYMENT_FAILED`.
+4. **Desfecho:**
+   - **aprovado:** o pedido vira `PAID` e a reserva vira baixa definitiva (`ORDER_CONFIRMED`);
+   - **recusado:** o pedido vira `CANCELLED` e o inventory **estorna a reserva** (compensação).
+
+O diagrama de sequência completo está em [docs/01-visao-e-arquitetura.md](./docs/01-visao-e-arquitetura.md#a-saga-de-checkout).
+
+## 🛡️ Garantias e como são obtidas
+
+| Problema | Solução | Prova |
+|---|---|---|
+| Gravar e publicar de forma atômica | **Transactional Outbox**, com relay que só marca `published` após o *publisher confirm* do broker | Teste de caos abaixo |
+| Mensagens duplicadas (*at-least-once*) | Tabela `processed_messages` + transições de estado condicionais | Unitários + E2E |
+| Dois pedidos disputando o mesmo item | `UPDATE … WHERE availableQty >= qty` + `CHECK (availableQty >= 0)` no banco | E2E: 12 pedidos simultâneos por 4 unidades → exatamente 4 pagos |
+| Falha no meio da Saga | Compensação: `payment_failed` estorna a reserva | E2E |
+| Cliente adulterando o preço | Preço resolvido no catalog-service; o que vem do cliente é descartado | Unitário + E2E |
+| Broker fora do ar | Reconexão com backoff (1s → 30s) e topologia redeclarada; health `503` enquanto degradado | Teste de caos abaixo |
+| Mensagem envenenada | Dead Letter Exchange + uma `*_dlq` por fila | — |
+| Seguir uma compra entre serviços | `X-Correlation-ID`: gateway → outbox → propriedade AMQP → `AsyncLocalStorage` | E2E + `grep` nos logs |
+| Escalada de privilégio | Cadastro público sempre cria `CUSTOMER`; o ADMIN é provisionado pelo servidor | E2E |
+
+Os trade-offs de cada decisão (coreografia × orquestração, outbox por polling × CDC etc.) e as
+limitações conhecidas estão em [docs/01](./docs/01-visao-e-arquitetura.md#decisões-arquiteturais-adrs-resumidos).
+
 ---
 
-## 🧩 Os 5 Microsserviços e suas Responsabilidades
+## 🚀 Rodando localmente
 
-| Microsserviço | Porta | Banco de Dados | Responsabilidade Principal | Padrões Aplicados |
-|---|---|---|---|---|
-| **User Service** | `:3000` | PostgreSQL (`user_db`) | Cadastro de usuários, hash bcrypt, login com emissão de token JWT (`HS256`) e papéis RBAC (`CUSTOMER` / `ADMIN`). | Transactional Outbox, Clean Architecture |
-| **Catalog Service** | `:3001` | MongoDB (`catalog_db`) | Vitrine de produtos NoSQL, busca textual indexada, paginação, sanitização contra injection e CRUD admin. | Clean Architecture, Mongoose Sanitization |
-| **Inventory Service** | `:3003` | PostgreSQL (`inventory_db`) | Reserva atômica de estoque por SKU, controle de itens reservados e estorno compensatório. | Saga Participant, Tabela de Idempotência |
-| **Order Service** | `:3004` | PostgreSQL (`order_db`) | Orquestração do ciclo de vida do pedido (`PENDING` → `STOCK_RESERVED` → `PAID` / `CANCELLED`), anti-IDOR. | Saga Coordinator, Outbox Pattern |
-| **Payment Service** | `:3005` | PostgreSQL (`payment_db`) | Regras antifraude, persistência idempotente e aprovação/recusa simulada para a Saga. | Saga Participant, Anti-fraud Rule |
+Pré-requisitos: **Docker** com Compose v2 e **Node.js 24+** (para os scripts de seed e E2E).
 
----
-
-## ⚡ Como Funciona a Saga Coreografada (Passo a Passo)
-
-Em vez de chamadas HTTP bloqueantes em cadeia, a compra funciona via **Coreografia de Eventos no RabbitMQ**:
-
-1. **Pedido Criado (`order_created`)**:
-   - O `order-service` recebe a requisição, calcula os totais no servidor, salva o pedido como `PENDING` e insere o evento na tabela `outbox` na mesma transação SQL.
-2. **Reserva de Estoque (`stock_reserved` ou `stock_rejected`)**:
-   - O `inventory-service` consome o evento. Se houver saldo para todos os itens, reserva as unidades e publica `stock_reserved`. Se não houver saldo, publica `stock_rejected` (cancelando o pedido).
-3. **Processamento de Pagamento (`payment_approved` ou `payment_failed`)**:
-   - O `payment-service` escuta `stock_reserved`. Se o valor for elegível, aprova e publica `payment_approved`. Caso contrário, publica `payment_failed`.
-4. **Fechamento ou Compensação**:
-   - **Cenário de Sucesso**: O `order-service` muda o status para `PAID` e o `notification-service` dispara o e-mail de confirmação.
-   - **Cenário de Falha (Compensação)**: O `order-service` muda o pedido para `CANCELLED`, e o `inventory-service` **estorna automaticamente o estoque reservado**.
-
----
-
-## 🛡️ Padrões de Resiliência & Observabilidade
-
-- **Transactional Outbox Pattern**: Garante entrega de eventos sem travar a escrita no banco de dados.
-- **Idempotência**: Todos os consumidores de eventos possuem a tabela `processed_messages` para evitar efeitos colaterais caso uma mensagem seja reenviada (*at-least-once delivery*).
-- **Dead Letter Exchange (DLQ)**: Mensagens malformadas ou com erro irrecuperável são enviadas para `ecommerce_events_dlx` e retidas nas filas `*_dlq`.
-- **Containers Non-Root**: Todos os containers rodam sob o usuário sem privilégios `node:node` para conformidade com AppArmor e hardening Linux.
-- **Rastreabilidade Distribuída**: Header `X-Correlation-ID` gerado no Nginx Gateway e propagado através de todos os serviços.
-
----
-
-## 🚀 Como Executar o Projeto
-
-### Pré-requisitos
-- **Docker** e **Docker Compose** instalados.
-- **Node.js 24+** (caso queira rodar scripts ou testes locais).
-
-### 1. Clonar e Iniciar Tudo
 ```bash
-# 1. Clone o repositório
 git clone https://github.com/luxuz24/meu-ecommerce-distribuido.git
 cd meu-ecommerce-distribuido
-
-# 2. Copie o arquivo de variáveis de ambiente
 cp .env.example .env
 
-# 3. Suba todo o ecossistema (5 microsserviços + Gateway + 3 Bancos + Frontend)
-docker compose up -d --build
+docker compose up -d --build --wait   # sobe 12 containers e espera todos os healthchecks
+npm run seed:demo                     # admin, cliente e 5 produtos com estoque
 ```
 
-### 2. Popular o Banco com Dados de Demonstração
-Em outro terminal, execute o seed automático:
-```bash
-npm run seed:demo
-```
-> Isso criará imediatamente:
-> - **Admin**: `admin@microstore.com` (Senha: `AdminPassword123!`)
-> - **Cliente**: `cliente@microstore.com` (Senha: `ClientePassword123!`)
-> - 5 produtos completos com estoque sincronizado no `catalog-service` e `inventory-service`.
-
----
-
-## 🖥️ Portas e Painéis Disponíveis
-
-| Serviço / Painel | URL | Descrição |
+| | URL | Credenciais |
 |---|---|---|
-| **Frontend Loja Virtual** | [http://localhost:3002](http://localhost:3002) | Vitrine, Carrinho, Meus Pedidos e modo Dev/Limpo |
-| **Living Architecture Showcase** | [http://localhost:3002/architecture](http://localhost:3002/architecture) | Laboratório interativo explicativo da arquitetura |
-| **API Gateway Nginx** | [http://localhost:8080](http://localhost:8080) | Ponto único de entrada com rate limit e proxy |
-| **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | Fila de eventos (Login: `guest` / `guest`) |
+| Loja | http://localhost:3002 | `cliente@microstore.com` / `ClientePassword123!` |
+| Painel admin | http://localhost:3002/admin/products | `admin@microstore.com` / `AdminPassword123!` |
+| Arquitetura interativa | http://localhost:3002/architecture | — |
+| API Gateway | http://localhost:8080 | — |
+| RabbitMQ Management | http://localhost:15672 | `guest` / `guest` |
 
----
+## 🔬 Roteiro de demonstração
 
-## 🧪 Testes e Qualidade
+**1. Compra feliz.** Na loja, adicione um produto ao carrinho e finalize. O pedido nasce
+`PENDING` e a tela acompanha sozinha até `PAID`, em cerca de 3s.
 
-O projeto conta com **44 testes unitários automatizados** em Vitest com Fakes In-Memory e validação no CI GitHub Actions:
+**2. Compensação.** Finalize outra compra marcando **"Simular Falha de Pagamento"**. O pedido
+termina `CANCELLED` e o estoque volta ao valor original.
+
+**3. Rastreabilidade.** Cada resposta traz um `X-Correlation-ID`, que aparece no inspetor de
+telemetria do modo Dev. Com ele você vê a compra atravessar os serviços:
 
 ```bash
-# Rodar todos os testes do monorepo
-npm test
+docker compose logs -t | grep <correlation-id>
 ```
 
+```
+order-service         POST /api/orders
+inventory-service     [inventory-service] cid=… <- order_created
+payment-service       [payment-service]   cid=… <- stock_reserved
+order-service         [order-service]     cid=… <- payment_failed
+inventory-service     [inventory-service] cid=… <- payment_failed   ← estorno
+notification-service  Correlation: cid=…
+```
+
+**4. Caos: derrube o broker no meio do fluxo.**
+
+```bash
+docker stop ecom_rabbitmq
+```
+
+Faça uma compra: ela é aceita (`201 PENDING`) e o evento fica guardado na outbox. O endpoint
+`/health/order` responde `503` com `"messaging":"disconnected"`.
+
+```bash
+docker start ecom_rabbitmq
+```
+
+Em poucos segundos os 5 serviços reconectam sozinhos e o pedido criado durante a queda conclui
+como `PAID`, sem perder nenhum evento.
+
 ---
+
+## 🧪 Testes
+
+```bash
+npm test           # 54 testes unitários (Vitest, fakes in-memory) em todos os serviços + frontend
+npm run test:e2e   # 8 cenários ponta a ponta contra a stack em execução
+```
+
+Os cenários E2E ([`scripts/e2e-saga.ts`](./scripts/e2e-saga.ts)) passam só pelo gateway e criam
+os próprios produtos, então podem rodar repetidamente:
+
+| Cenário | Verifica |
+|---|---|
+| Caminho feliz | `PAID`, valor cobrado = total do servidor, reserva convertida em baixa |
+| Compensação | Pagamento recusado → `CANCELLED` e estoque integralmente estornado |
+| Falta de estoque | `STOCK_REJECTED` → `CANCELLED`, nenhuma cobrança criada |
+| Antifraude | Compra acima de R$ 50.000 recusada |
+| Integridade de preço | Preço/nome/SKU enviados pelo cliente são ignorados |
+| Concorrência | 12 pedidos simultâneos por 4 unidades → exatamente 4 pagos, estoque final 0 |
+| Rastreabilidade | `X-Correlation-ID` do cliente preservado pelo gateway |
+| Segurança | Cadastro com `role: ADMIN` vira `CUSTOMER`; cliente não força a Saga nem chama endpoints internos |
+
+No **CI** (GitHub Actions), cada PR roda build e testes unitários de cada serviço e do frontend.
+Em seguida sobe a stack completa do zero, executa o seed e roda a suíte E2E; se algo falhar, os
+logs dos containers são anexados ao job.
+
+## 📚 Documentação
+
+| Documento | Conteúdo |
+|---|---|
+| [Visão e Arquitetura](./docs/01-visao-e-arquitetura.md) | Sequência da Saga, garantias, ADRs, limitações |
+| [Contratos de API e Eventos](./docs/04-contratos-api-e-eventos.md) | Endpoints, autorização, eventos e payloads |
+| [Convenções de Código](./docs/03-convencoes-de-codigo.md) | Clean Architecture e padrões do monorepo |
+| [Fluxo, SOLID e Segurança](./docs/06-fluxo-solid-e-seguranca.md) | Processo de PR e checklist de segurança |
 
 ## 📄 Licença
 
-Distribuído sob a licença MIT. Veja `LICENSE` para mais detalhes.
+Distribuído sob a licença MIT. Veja [`LICENSE`](./LICENSE).

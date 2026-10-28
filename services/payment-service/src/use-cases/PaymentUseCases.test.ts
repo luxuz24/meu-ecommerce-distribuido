@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Payment } from '../domain/entities/Payment.js';
-import { PaymentNotFoundError } from '../domain/errors/PaymentErrors.js';
+import { PaymentAccessDeniedError, PaymentNotFoundError } from '../domain/errors/PaymentErrors.js';
 import {
   type IPaymentRepository,
   type ProcessPaymentData,
@@ -85,7 +85,7 @@ describe('Payment Service Use Cases & Saga Compensation', () => {
     expect(repo.outboxEvents).toHaveLength(1);
     expect(repo.outboxEvents[0]?.eventType).toBe('PAYMENT_APPROVED');
 
-    const stored = await getPaymentByOrderIdUseCase.execute('order-501');
+    const stored = await getPaymentByOrderIdUseCase.execute('order-501', { userId: 'user-501', role: 'CUSTOMER' });
     expect(stored.amount).toBe(549.9);
   });
 
@@ -125,7 +125,21 @@ describe('Payment Service Use Cases & Saga Compensation', () => {
 
   it('should throw PaymentNotFoundError when querying non-existent orderId', async () => {
     await expect(
-      getPaymentByOrderIdUseCase.execute('unknown-order')
+      getPaymentByOrderIdUseCase.execute('unknown-order', { userId: 'u1', role: 'ADMIN' })
     ).rejects.toThrow(PaymentNotFoundError);
+  });
+
+  it('should let only the payment owner or an ADMIN read a payment (anti-IDOR)', async () => {
+    await processPaymentUseCase.execute({ orderId: 'ord-owned', userId: 'owner', amount: 100 });
+
+    const ownView = await getPaymentByOrderIdUseCase.execute('ord-owned', { userId: 'owner', role: 'CUSTOMER' });
+    expect(ownView.orderId).toBe('ord-owned');
+
+    const adminView = await getPaymentByOrderIdUseCase.execute('ord-owned', { userId: 'ops', role: 'ADMIN' });
+    expect(adminView.orderId).toBe('ord-owned');
+
+    await expect(
+      getPaymentByOrderIdUseCase.execute('ord-owned', { userId: 'intruder', role: 'CUSTOMER' })
+    ).rejects.toThrow(PaymentAccessDeniedError);
   });
 });

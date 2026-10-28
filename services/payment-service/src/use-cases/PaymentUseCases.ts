@@ -1,5 +1,5 @@
 import { type Payment } from '../domain/entities/Payment.js';
-import { PaymentNotFoundError } from '../domain/errors/PaymentErrors.js';
+import { PaymentAccessDeniedError, PaymentNotFoundError } from '../domain/errors/PaymentErrors.js';
 import {
   type IPaymentRepository,
   type ProcessPaymentResult,
@@ -49,10 +49,17 @@ export class ProcessPaymentUseCase {
 export class GetPaymentByOrderIdUseCase {
   constructor(private readonly paymentRepository: IPaymentRepository) {}
 
-  async execute(orderId: string): Promise<Payment> {
+  async execute(
+    orderId: string,
+    requester: { userId: string; role: 'CUSTOMER' | 'ADMIN' }
+  ): Promise<Payment> {
     const payment = await this.paymentRepository.findByOrderId(orderId.trim());
     if (!payment) {
       throw new PaymentNotFoundError(orderId);
+    }
+    // Anti-IDOR: o cliente só enxerga o pagamento dos próprios pedidos
+    if (payment.userId !== requester.userId && requester.role !== 'ADMIN') {
+      throw new PaymentAccessDeniedError(orderId);
     }
     return payment;
   }

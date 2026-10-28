@@ -86,6 +86,16 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ **Telemetria Limpa**: Toggle instantâneo entre **Modo Telemetria Dev** e **Modo Loja Limpa** (`<DevOnly>`) no topo da página
 Ver detalhes em [05-frontend-plano.md](./05-frontend-plano.md).
 
+### Fase 7 — Hardening para estudo de caso
+- ✅ **Integridade de preço**: order-service resolve preço/nome/SKU no catalog-service; cliente envia só `{productId, quantity}`
+- ✅ **Sem overselling**: reserva por `UPDATE` condicional, `CHECK (availableQty >= 0)`, `prefetch` nos consumers
+- ✅ **Fechamento da Saga**: `order_confirmed` converte a reserva em baixa definitiva
+- ✅ **Mensageria resiliente**: reconexão com backoff, publisher confirms, healthchecks e `depends_on: service_healthy`
+- ✅ **Gateway como porta única**: serviços sem portas no host; `X-Correlation-ID` propagado por HTTP → outbox → AMQP
+- ✅ **Segurança**: cadastro público não concede ADMIN; rate limit por IP real (`trustProxy` + XFF sobrescrito na borda); pagamento visível só ao dono/ADMIN
+- ✅ **Testes E2E**: 8 cenários da Saga contra a stack real, executados no CI
+- ✅ **Banco por serviço de fato**: user-service migrado para `user_db`
+
 ## C. Ordem sugerida de execução
 1. Fase 0 → 2. Fase 1 e Fase 2 (paralelas) → 3. Fase 6 (MVP: cadastro/login/catálogo) → 4. Fase 3 → 5. Fase 4 → 6. Fase 5 → 7. Frontend de pedidos/pagamento.
 

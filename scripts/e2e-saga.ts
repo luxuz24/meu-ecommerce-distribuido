@@ -34,7 +34,7 @@ interface Stock {
 // ---------------------------------------------------------------- HTTP helpers
 
 async function call<T = unknown>(
-  method: 'GET' | 'POST' | 'PATCH',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   opts: { body?: unknown; token?: string; correlationId?: string } = {}
 ): Promise<{ status: number; data: T; headers: Headers }> {
@@ -48,7 +48,7 @@ async function call<T = unknown>(
 }
 
 async function rawCall(
-  method: 'GET' | 'POST' | 'PATCH',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   opts: { body?: unknown; token?: string; correlationId?: string }
 ): Promise<{ status: number; data: unknown; headers: Headers }> {
@@ -80,6 +80,7 @@ async function newCustomer(): Promise<string> {
 }
 
 let skuCounter = 0;
+const createdProductIds: string[] = [];
 async function newProduct(
   adminToken: string,
   price: number,
@@ -91,6 +92,7 @@ async function newProduct(
     body: { name: `Produto ${sku}`, description: 'Produto do teste E2E', sku, price, stock },
   });
   assert.equal(created.status, 201, `criação do produto falhou (HTTP ${created.status})`);
+  createdProductIds.push(created.data.id);
 
   const seeded = await call('POST', '/api/inventory/seed', {
     token: adminToken,
@@ -306,6 +308,13 @@ async function main(): Promise<void> {
       console.log(`  ✗ ${name}\n      ${(err as Error).message.split('\n').join('\n      ')}`);
     }
   }
+
+  // Limpeza: soft delete dos produtos de teste para não poluir a vitrine da demo
+  const cleanup = await Promise.all(
+    createdProductIds.map((id) => call('DELETE', `/api/products/${id}`, { token: adminToken }))
+  );
+  const notCleaned = cleanup.filter((r) => r.status !== 204).length;
+  if (notCleaned > 0) console.warn(`  ! ${notCleaned} produto(s) de teste não foram desativados`);
 
   console.log(`\n${scenarios.length - failed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

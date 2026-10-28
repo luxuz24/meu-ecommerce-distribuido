@@ -66,7 +66,7 @@ services:
     container_name: user-service
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/user_db?schema=public
       - JWT_SECRET=${JWT_SECRET}
       - PORT=${PORT}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@microstore.com}
@@ -90,7 +90,7 @@ services:
     container_name: user-outbox-processor
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/user_db?schema=public
       - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
     networks:
       - ecom_network

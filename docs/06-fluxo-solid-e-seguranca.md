@@ -1,6 +1,6 @@
-# 06 — Fluxo de Trabalho, SOLID e Segurança para Agentes
+# 06 — Fluxo de Trabalho, SOLID e Segurança
 
-Documento **normativo**. Complementa `03-convencoes-e-regras-para-agentes.md`. Em conflito, vale o mais restritivo.
+Documento **normativo**. Complementa `03-convencoes-de-codigo.md`. Em conflito, vale o mais restritivo.
 
 ---
 
@@ -12,7 +12,7 @@ Documento **normativo**. Complementa `03-convencoes-e-regras-para-agentes.md`. E
 3. Commits pequenos em **Conventional Commits** (`feat(catalog-service): add list products`).
 4. Escrever/atualizar **testes junto** com o código (ver seção 5).
 5. Antes de abrir o PR, rodar localmente no(s) serviço(s) alterado(s): `npm run lint`, `npm run build`, `npm test`. Se algo falhar, corrigir — nunca desabilitar teste, lint ou regra para passar.
-6. **Abrir o Pull Request e devolvê-lo ao usuário** (link do PR + resumo). O agente **não faz merge**; quem aprova e mergeia é o usuário.
+6. **Abrir o Pull Request** com resumo da mudança e evidência dos testes. Nenhum PR é mergeado sem revisão e CI verde.
 7. **Merge só se o CI estiver verde** (todos os checks obrigatórios). PR com teste falhando ou sem teste do novo comportamento não é mergeado.
 8. Um escopo por PR. Atualizar docs (`02-planejamento-roadmap.md`, `04-contratos-api-e-eventos.md`) no mesmo PR.
 

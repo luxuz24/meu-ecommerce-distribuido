@@ -1,43 +1,24 @@
-# Docs — Guia para Agentes de Desenvolvimento
+# Documentação técnica
 
-Este diretório é a **fonte de verdade** para qualquer agente (ou dev) que trabalhe neste monorepo — e também funciona diretamente como um **Vault do Obsidian** (`docs/.obsidian/`). Leia na ordem abaixo antes de alterar código.
-
-| # | Documento | Para que serve |
-|---|-----------|----------------|
-| 01 | [01-visao-e-arquitetura.md](./01-visao-e-arquitetura.md) | O que o sistema faz, serviços, infra, fluxo de eventos, estado real da Clean Architecture |
-| 02 | [02-planejamento-roadmap.md](./02-planejamento-roadmap.md) | **Planejamento**: o que já foi feito, o que falta, fases e prioridades |
-| 03 | [03-convencoes-e-regras-para-agentes.md](./03-convencoes-e-regras-para-agentes.md) | Regras obrigatórias: Clean Arch, TypeScript, git, Docker, testes |
-| 04 | [04-contratos-api-e-eventos.md](./04-contratos-api-e-eventos.md) | Endpoints atuais/planejados e eventos RabbitMQ |
-| 05 | [05-frontend-plano.md](./05-frontend-plano.md) | Plano do frontend, stack implementada e diretriz `<DevOnly>` vs. Modo Loja Limpa |
-| 06 | [06-fluxo-solid-e-seguranca.md](./06-fluxo-solid-e-seguranca.md) | **Como os agentes trabalham**: branch + PR + testes como gate de merge, SOLID, segurança (SQL injection, CORS, rate limit, load balancer…) |
-| 07 | [07-orquestracao-de-agentes.md](./07-orquestracao-de-agentes.md) | **Orquestração Multi-Agente por Tarefa**: pipeline de execução, matriz das próximas fases e protocolo de handoff |
-
-## Perfis dos 5 Agentes Especialistas (`docs/agents/`)
-
-| Agente | Arquivo | Responsabilidade |
-|---|---|---|
-| **Banco de Dados (`agent-database`)** | [agents/agent-database.md](./agents/agent-database.md) | PostgreSQL/Prisma, MongoDB/Mongoose, Migrations, Transactional Outbox, Idempotência e Anti-Injection |
-| **Backend (`agent-backend`)** | [agents/agent-backend.md](./agents/agent-backend.md) | Microsserviços Fastify/TypeScript em Clean Architecture, SOLID, RabbitMQ Saga, JWT/RBAC e Nginx Gateway |
-| **Frontend (`agent-frontend`)** | [agents/agent-frontend.md](./agents/agent-frontend.md) | React 19/Vite/Tailwind (Stitch Design), integração de APIs e isolamento `<DevOnly>` vs. Produção Limpa |
-| **Testes & QA (`agent-qa-tests`)** | [agents/agent-qa-tests.md](./agents/agent-qa-tests.md) | Testes unitários Vitest (Fakes In-Memory), testes de segurança/contratos, pipeline CI e Quality Gate de PR |
-| **Grafo & Obsidian (`agent-graph`)** | [agents/agent-graph.md](./agents/agent-graph.md) | Atualização contínua do Grafo de Conhecimento (`graphify-out/`), Vault Obsidian (`docs/obsidian/`) e análise de impacto arquitetural |
-
-## Regras de manutenção
-- Ao concluir uma tarefa, **atualize o checklist** em `02-planejamento-roadmap.md`.
-- Ao criar/alterar endpoint ou evento, **atualize** `04-contratos-api-e-eventos.md` no mesmo PR.
-- Antes de abrir qualquer PR, execute `npm run graph:update` (`agent-graph`) para manter `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e o Vault Obsidian (`docs/obsidian/`) sincronizados.
-- Se um doc divergir do código, o código vence — corrija o doc.
+| # | Documento | Conteúdo |
+|---|-----------|----------|
+| 01 | [Visão e Arquitetura](./01-visao-e-arquitetura.md) | Topologia, sequência da Saga, garantias de cada mecanismo, ADRs e limitações conhecidas |
+| 02 | [Planejamento e Roadmap](./02-planejamento-roadmap.md) | Evolução do projeto por fases |
+| 03 | [Convenções de Código](./03-convencoes-de-codigo.md) | Clean Architecture, TypeScript, estrutura de pastas, Docker, testes |
+| 04 | [Contratos de API e Eventos](./04-contratos-api-e-eventos.md) | Endpoints (via gateway), autorização e eventos RabbitMQ |
+| 05 | [Frontend](./05-frontend-plano.md) | Stack do frontend e o modo Dev (`<DevOnly>`) vs. Loja Limpa |
+| 06 | [Fluxo, SOLID e Segurança](./06-fluxo-solid-e-seguranca.md) | Fluxo de PR, princípios SOLID e checklist de segurança |
 
 ## Comandos rápidos
 ```bash
-docker compose up -d          # sobe tudo (infra + serviços + gateway + frontend)
-docker compose ps             # status
-docker compose logs -f <svc>  # logs
-docker compose up -d --build <svc>   # rebuild de um serviço
-npm run build                 # builda todos os serviços e o frontend
-npm test                      # roda todos os testes unitários do monorepo
-npm run graph:update          # atualiza o grafo Graphify + exporta Vault Obsidian (docs/obsidian) e HTML
-npm run graph:explain -- <Nó> # mostra vizinhança e conexões de um símbolo no grafo
-npm run graph:path -- <A> <B> # mostra o menor caminho arquitetural entre dois nós
+docker compose up -d --build --wait   # sobe tudo e espera todos os healthchecks
+npm run seed:demo                     # dados de demonstração (via gateway)
+npm test                              # testes unitários de todos os serviços + frontend
+npm run test:e2e                      # testes ponta a ponta da Saga contra a stack real
+docker compose logs -f <serviço>      # logs de um serviço
 ```
-Portas no host: user `3000`, catalog `3001`, frontend `3002`, API Gateway `8080`, Postgres `5434` (5432 do host está ocupada), Mongo `27017`, RabbitMQ `5672`/`15672`.
+
+Portas no host: frontend `3002`, API Gateway `8080`, Postgres `5434`, MongoDB `27017`,
+RabbitMQ `5672` / painel `15672`. Os microsserviços não são expostos: tudo passa pelo gateway.
+
+Se um documento divergir do código, o código vence — corrija o documento no mesmo PR.
