@@ -66,15 +66,15 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ API Gateway Nginx (`gateway/nginx.conf` em `http://localhost:8080`) roteando `/users`, `/login` e `/api/products`
 
 ### Fase 4 — Novos serviços (bancos já provisionados)
-- ⬜ **inventory-service** (`inventory_db`): estoque/reservas; consome `ORDER_CREATED`, emite `STOCK_RESERVED`/`STOCK_REJECTED`
+- ✅ **inventory-service** (`inventory_db`): estoque/reservas em Clean Architecture (`InventoryItem`, `StockReservation`, `Outbox`, `ProcessedMessage` para idempotência); consome `ORDER_CREATED` e `PAYMENT_FAILED`, emite `STOCK_RESERVED`/`STOCK_REJECTED`
 - ⬜ **order-service** (`order_db`): carrinho/pedidos, outbox, saga de criação de pedido
 - ⬜ **payment-service** (`payment_db`): pagamento simulado; consome `STOCK_RESERVED`, emite `PAYMENT_APPROVED/FAILED`
-- ⬜ Saga coreografada: Order → Inventory → Payment → Order (confirmação/compensação)
+- 🟡 Saga coreografada: Order → Inventory → Payment → Order (confirmação/compensação)
 - ⬜ Estender notification-service: pedido confirmado, pagamento falhou
-- ⬜ Cada serviço: Dockerfile, entrada no compose, `.env.example`, migrations, testes
+- 🟡 Cada serviço: Dockerfile, entrada no compose, `.env.example`, migrations, testes
 
 ### Fase 5 — Resiliência e observabilidade
-- ⬜ Idempotência nos consumidores (tabela `processed_messages` / `messageId`)
+- 🟡 Idempotência nos consumidores (tabela `processed_messages` / `messageId` implementada no `inventory-service`)
 - ⬜ Retry + DLQ no RabbitMQ; `nack` correto no notification-service
 - ⬜ Outbox genérico reutilizável (processor parametrizado por serviço/DB)
 - ⬜ Logs estruturados, correlation-id, `/health` com checagem de dependências

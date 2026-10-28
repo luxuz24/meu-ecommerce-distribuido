@@ -1,9 +1,11 @@
 import type {
   ApiTelemetryRecord,
   CreateProductInput,
+  InventoryItemRecord,
   LoginResponse,
   PaginatedProducts,
   Product,
+  ReserveStockResponse,
   UpdateProductInput,
   User,
 } from '../domain/types';
@@ -12,6 +14,8 @@ export const USER_API_URL =
   import.meta.env.VITE_USER_API_URL || 'http://localhost:3000';
 export const CATALOG_API_URL =
   import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3001';
+export const INVENTORY_API_URL =
+  import.meta.env.VITE_INVENTORY_API_URL || 'http://localhost:3003';
 
 export class ApiError extends Error {
   public readonly statusCode: number;
@@ -224,5 +228,54 @@ export const catalogApi = {
             ? localStorage.getItem('microstore_jwt_token')
             : null),
       }
+    ),
+};
+
+export const inventoryApi = {
+  checkHealth: () =>
+    requestWithTelemetry<{ status: string; service: string }>(
+      'inventory-service:3003',
+      INVENTORY_API_URL,
+      'GET',
+      '/health'
+    ),
+
+  getBySku: (sku: string) =>
+    requestWithTelemetry<InventoryItemRecord>(
+      'inventory-service:3003',
+      INVENTORY_API_URL,
+      'GET',
+      `/api/inventory/${encodeURIComponent(sku)}`
+    ),
+
+  seedStock: (
+    payload: { productId: string; sku: string; availableQty: number },
+    token?: string | null
+  ) =>
+    requestWithTelemetry<InventoryItemRecord>(
+      'inventory-service:3003',
+      INVENTORY_API_URL,
+      'POST',
+      '/api/inventory/seed',
+      {
+        body: payload,
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
+    ),
+
+  reserveOrderStock: (payload: {
+    orderId: string;
+    items: Array<{ sku: string; quantity: number }>;
+  }) =>
+    requestWithTelemetry<ReserveStockResponse>(
+      'inventory-service:3003',
+      INVENTORY_API_URL,
+      'POST',
+      '/api/inventory/reserve',
+      { body: payload }
     ),
 };
