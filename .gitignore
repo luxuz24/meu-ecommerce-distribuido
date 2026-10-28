@@ -16,6 +16,14 @@ build/
 Front_referencias/
 front_references/
 
+# Graphify local cache & generated Obsidian AST vault (rebuilt via npm run graph:update)
+graphify-out/cache/
+graphify-out/graph.html
+graphify-out/.graphify_labels.pending.json
+docs/obsidian/
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
+
 # OS
 .DS_Store
 Thumbs.db

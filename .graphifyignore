@@ -1,0 +1,12 @@
+# Dependências e builds
+node_modules/
+dist/
+build/
+
+# Referências locais de UI (Stitch)
+Front_referencias/
+front_references/
+
+# Saídas geradas pelo próprio Graphify / Obsidian export
+graphify-out/
+docs/obsidian/
