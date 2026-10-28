@@ -240,6 +240,44 @@ export class PrismaInventoryRepository implements IInventoryRepository {
       throw err;
     }
   }
+  async confirmOrderReservation(orderId: string, messageId?: string): Promise<boolean> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (messageId) {
+          const alreadyProcessed = await tx.processedMessage.findUnique({
+            where: { messageId },
+          });
+          if (alreadyProcessed) return false;
+        }
+
+        const { count } = await tx.stockReservation.updateMany({
+          where: { orderId, status: 'RESERVED' },
+          data: { status: 'CONFIRMED' },
+        });
+        if (count === 0) return false;
+
+        const reservation = await tx.stockReservation.findUniqueOrThrow({ where: { orderId } });
+        const items = reservation.items as unknown as ReservationItemEntry[];
+        for (const item of items) {
+          await tx.inventoryItem.update({
+            where: { sku: item.sku },
+            data: { reservedQty: { decrement: item.quantity } },
+          });
+        }
+
+        if (messageId) {
+          await tx.processedMessage.create({
+            data: { messageId, eventType: 'ORDER_CONFIRMED' },
+          });
+        }
+
+        return true;
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) return false;
+      throw err;
+    }
+  }
 }
 
 class StockShortage extends Error {

@@ -8,6 +8,7 @@ import {
   inventoryController,
   reserveStockUseCase,
   releaseStockUseCase,
+  confirmStockUseCase,
 } from './infra/container.js';
 import { registerInventoryRoutes } from './infra/http/routes/inventoryRoutes.js';
 import { startInventoryMessaging } from './infra/messaging/InventoryEventWorker.js';
@@ -20,7 +21,12 @@ const app = Fastify({
 const start = async () => {
   try {
     // Conecta em background com retry: o HTTP sobe mesmo com o broker ainda indisponível
-    const rabbit = startInventoryMessaging(prisma, reserveStockUseCase, releaseStockUseCase);
+    const rabbit = startInventoryMessaging(
+      prisma,
+      reserveStockUseCase,
+      releaseStockUseCase,
+      confirmStockUseCase
+    );
 
     await app.register(helmet);
 

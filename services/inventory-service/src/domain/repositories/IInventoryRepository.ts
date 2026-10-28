@@ -30,4 +30,5 @@ export interface IInventoryRepository {
   hasProcessedMessage(messageId: string): Promise<boolean>;
   reserveOrderStockWithOutbox(input: ReserveOrderInput): Promise<ReserveOrderResult>;
   releaseOrderReservationWithOutbox(orderId: string, messageId?: string): Promise<boolean>;
+  confirmOrderReservation(orderId: string, messageId?: string): Promise<boolean>;
 }
