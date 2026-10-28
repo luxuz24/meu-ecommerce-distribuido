@@ -3,7 +3,9 @@ import { type PrismaClient } from '@prisma/client';
 import { type ProcessPaymentUseCase } from '../../use-cases/PaymentUseCases.js';
 
 const EXCHANGE_NAME = 'ecommerce_events';
+const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
 const STOCK_RESERVED_QUEUE = 'payment_stock_reserved';
+const STOCK_RESERVED_DLQ = 'payment_stock_reserved_dlq';
 const OUTBOX_POLL_MS = 3000;
 
 export async function startPaymentMessaging(
@@ -20,8 +22,18 @@ export async function startPaymentMessaging(
     const conn = await amqp.connect(rabbitUrl);
     const channel = await conn.createChannel();
     await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
+    await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
 
-    await channel.assertQueue(STOCK_RESERVED_QUEUE, { durable: true });
+    await channel.assertQueue(STOCK_RESERVED_DLQ, { durable: true });
+    await channel.bindQueue(STOCK_RESERVED_DLQ, DLX_EXCHANGE_NAME, STOCK_RESERVED_DLQ);
+
+    await channel.assertQueue(STOCK_RESERVED_QUEUE, {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': DLX_EXCHANGE_NAME,
+        'x-dead-letter-routing-key': STOCK_RESERVED_DLQ,
+      },
+    });
     await channel.bindQueue(STOCK_RESERVED_QUEUE, EXCHANGE_NAME, 'stock_reserved');
 
     await channel.consume(STOCK_RESERVED_QUEUE, async (msg) => {

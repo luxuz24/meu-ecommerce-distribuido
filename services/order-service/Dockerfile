@@ -17,12 +17,13 @@ FROM node:24-alpine AS runner
 
 WORKDIR /usr/src/app
 
-COPY --from=builder /usr/src/app/package*.json ./
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/prisma ./prisma
-COPY --from=builder /usr/src/app/prisma.config.ts ./
+COPY --from=builder --chown=node:node /usr/src/app/package*.json ./
+COPY --from=builder --chown=node:node /usr/src/app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /usr/src/app/dist ./dist
+COPY --from=builder --chown=node:node /usr/src/app/prisma ./prisma
+COPY --from=builder --chown=node:node /usr/src/app/prisma.config.ts ./
 
+USER node
 EXPOSE 3004
 
 CMD ["npm", "run", "start"]

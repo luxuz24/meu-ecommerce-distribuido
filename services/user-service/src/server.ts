@@ -3,10 +3,12 @@ import Fastify from "fastify";
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import { prisma } from "./infra/database/prisma.js";
 import { userRoutes } from "./infra/http/controllers/UserController.js";
 
 const app = Fastify({
-    logger: true
+    logger: true,
+    requestIdHeader: 'x-correlation-id',
 });
 
 const start = async () => {
@@ -25,7 +27,8 @@ const start = async () => {
                 cb(new Error('Not allowed by CORS'), false);
             },
             methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-            allowedHeaders: ['Content-Type', 'Authorization'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID'],
+            exposedHeaders: ['X-Correlation-ID'],
             credentials: true,
             maxAge: 600,
         });
@@ -35,8 +38,26 @@ const start = async () => {
             timeWindow: '1 minute',
         });
 
+        app.addHook('onSend', async (request, reply) => {
+            reply.header('x-correlation-id', request.id);
+        });
+
+        app.setErrorHandler((error: Error & { statusCode?: number; validation?: unknown }, request, reply) => {
+            request.log.error({ err: error, correlationId: request.id }, 'Unhandled request error');
+            const statusCode = error.validation ? 400 : (error.statusCode ?? 500);
+            reply.status(statusCode).send({
+                error: statusCode === 500 ? 'Internal Server Error' : error.message,
+                correlationId: request.id,
+            });
+        });
+
         app.get('/health', async (request, reply) => {
-            return { status: 'up', service: 'user-service' };
+            try {
+                await prisma.$queryRaw`SELECT 1`;
+                return { status: 'up', service: 'user-service', database: 'connected' };
+            } catch {
+                return reply.status(503).send({ status: 'degraded', service: 'user-service', database: 'disconnected' });
+            }
         });
 
         await app.register(userRoutes);

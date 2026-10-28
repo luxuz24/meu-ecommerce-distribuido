@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseNotificationEvent } from './index.js';
+import {
+  buildNotificationQueueArguments,
+  DLQ_QUEUE_NAME,
+  DLX_EXCHANGE_NAME,
+  parseNotificationEvent,
+} from './index.js';
 
 describe('Notification payload parser (User & Saga Order/Payment events)', () => {
   it('should parse direct user_created payload format', () => {
@@ -52,6 +57,14 @@ describe('Notification payload parser (User & Saga Order/Payment events)', () =>
       type: 'PAYMENT_FAILED_ALERT',
       recipient: 'user-100',
       summary: 'Payment failed for Order #ord-100 (CARD_DECLINED)',
+    });
+  });
+
+  it('should configure Dead Letter Exchange (DLX) and Dead Letter Queue (DLQ) arguments', () => {
+    const args = buildNotificationQueueArguments();
+    expect(args).toEqual({
+      'x-dead-letter-exchange': DLX_EXCHANGE_NAME,
+      'x-dead-letter-routing-key': DLQ_QUEUE_NAME,
     });
   });
 });
