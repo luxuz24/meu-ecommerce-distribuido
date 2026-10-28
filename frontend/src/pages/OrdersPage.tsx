@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import type { ApiTelemetryRecord, Order, OrderStatus } from '../domain/types';
-import { ApiError, inventoryApi, orderApi } from '../services/api';
+import { ApiError, inventoryApi, orderApi, paymentApi } from '../services/api';
 import { formatBRL } from './CatalogPage';
 
 function statusBadgeStyle(status: OrderStatus): {
@@ -143,6 +143,22 @@ export const OrdersPage: React.FC = () => {
           });
         } catch {
           // Ignore if inventory-service is handled via RabbitMQ
+        }
+      }
+      if (eventType === 'PAYMENT_APPROVED' || eventType === 'PAYMENT_FAILED') {
+        try {
+          await paymentApi.processPayment({
+            orderId: order.id,
+            userId: order.userId,
+            amount: order.total,
+            simulateOutcome:
+              eventType === 'PAYMENT_APPROVED' ? 'APPROVED' : 'FAILED',
+            ...(eventType === 'PAYMENT_FAILED'
+              ? { failureReason: 'CARD_DECLINED_SIMULATION' }
+              : {}),
+          });
+        } catch {
+          // Ignore if payment-service is handled via RabbitMQ
         }
       }
       const res = await orderApi.triggerSagaEvent(

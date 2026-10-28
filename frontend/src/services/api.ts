@@ -5,6 +5,8 @@ import type {
   LoginResponse,
   Order,
   PaginatedProducts,
+  PaymentRecord,
+  ProcessPaymentResponse,
   Product,
   ReserveStockResponse,
   UpdateProductInput,
@@ -19,6 +21,8 @@ export const INVENTORY_API_URL =
   import.meta.env.VITE_INVENTORY_API_URL || 'http://localhost:3003';
 export const ORDER_API_URL =
   import.meta.env.VITE_ORDER_API_URL || 'http://localhost:3004';
+export const PAYMENT_API_URL =
+  import.meta.env.VITE_PAYMENT_API_URL || 'http://localhost:3005';
 
 export class ApiError extends Error {
   public readonly statusCode: number;
@@ -374,5 +378,38 @@ export const orderApi = {
             ? localStorage.getItem('microstore_jwt_token')
             : null),
       }
+    ),
+};
+
+export const paymentApi = {
+  checkHealth: () =>
+    requestWithTelemetry<{ status: string; service: string }>(
+      'payment-service:3005',
+      PAYMENT_API_URL,
+      'GET',
+      '/health'
+    ),
+
+  getByOrderId: (orderId: string) =>
+    requestWithTelemetry<PaymentRecord>(
+      'payment-service:3005',
+      PAYMENT_API_URL,
+      'GET',
+      `/api/payments/${encodeURIComponent(orderId)}`
+    ),
+
+  processPayment: (payload: {
+    orderId: string;
+    userId?: string;
+    amount: number;
+    simulateOutcome?: 'APPROVED' | 'FAILED';
+    failureReason?: string;
+  }) =>
+    requestWithTelemetry<ProcessPaymentResponse>(
+      'payment-service:3005',
+      PAYMENT_API_URL,
+      'POST',
+      '/api/payments/process',
+      { body: payload }
     ),
 };

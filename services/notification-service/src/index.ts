@@ -1,76 +1,127 @@
 import 'dotenv/config';
 import amqp from 'amqplib';
 
+export interface NotificationAction {
+  type: 'WELCOME_EMAIL' | 'ORDER_CONFIRMED_EMAIL' | 'PAYMENT_FAILED_ALERT' | 'ORDER_CANCELLED_ALERT';
+  recipient: string;
+  summary: string;
+}
+
+export function parseNotificationEvent(
+  routingKey: string,
+  rawMessage: string
+): NotificationAction | null {
+  const eventData = JSON.parse(rawMessage);
+  const data = eventData.payload
+    ? typeof eventData.payload === 'string'
+      ? JSON.parse(eventData.payload)
+      : eventData.payload
+    : eventData;
+
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  if (routingKey === 'user_created') {
+    if (!data.email) return null;
+    return {
+      type: 'WELCOME_EMAIL',
+      recipient: String(data.email),
+      summary: `Welcome email to ${data.name ?? data.email}`,
+    };
+  }
+
+  if (routingKey === 'order_confirmed') {
+    if (!data.orderId) return null;
+    return {
+      type: 'ORDER_CONFIRMED_EMAIL',
+      recipient: String(data.userId ?? 'customer'),
+      summary: `Order #${data.orderId} confirmed (Total: R$ ${data.total ?? 0})`,
+    };
+  }
+
+  if (routingKey === 'payment_failed') {
+    if (!data.orderId) return null;
+    return {
+      type: 'PAYMENT_FAILED_ALERT',
+      recipient: String(data.userId ?? 'customer'),
+      summary: `Payment failed for Order #${data.orderId} (${data.reason ?? 'DECLINED'})`,
+    };
+  }
+
+  if (routingKey === 'order_cancelled') {
+    if (!data.orderId) return null;
+    return {
+      type: 'ORDER_CANCELLED_ALERT',
+      recipient: String(data.userId ?? 'customer'),
+      summary: `Order #${data.orderId} cancelled (${data.reason ?? 'CANCELLED'})`,
+    };
+  }
+
+  return null;
+}
+
 async function startConsumer() {
   try {
     const rabbitmqUrl = process.env.RABBITMQ_URL;
     if (!rabbitmqUrl) {
-      throw new Error("CRITICAL: RABBITMQ_URL is missing in .env");
+      throw new Error('CRITICAL: RABBITMQ_URL is missing in .env');
     }
 
-    console.log(" Connecting to RabbitMQ...");
+    console.log('Connecting to RabbitMQ...');
     const connection = await amqp.connect(rabbitmqUrl);
     const channel = await connection.createChannel();
 
     const exchangeName = 'ecommerce_events';
-    const routingKey = 'user_created';
-    const queueName = 'notification_user_created';
+    const queueName = 'notification_events_queue';
+    const routingKeys = [
+      'user_created',
+      'order_confirmed',
+      'payment_failed',
+      'order_cancelled',
+    ];
 
     await channel.assertExchange(exchangeName, 'topic', { durable: true });
     await channel.assertQueue(queueName, { durable: true });
-    await channel.bindQueue(queueName, exchangeName, routingKey);
+    for (const key of routingKeys) {
+      await channel.bindQueue(queueName, exchangeName, key);
+    }
 
-    console.log(` Listening! Bound Queue "${queueName}" to Exchange "${exchangeName}"`);
+    console.log(
+      `Listening! Bound Queue "${queueName}" to Exchange "${exchangeName}" for [${routingKeys.join(', ')}]`
+    );
 
-    channel.consume(queueName, (message) => {
+    await channel.consume(queueName, (message) => {
       if (message !== null) {
         try {
+          const routingKey = message.fields.routingKey || 'user_created';
           const rawMessage = message.content.toString();
-          const eventData = JSON.parse(rawMessage);
-          
-          
-          console.log('\n RAW EVENT DATA:', eventData);
+          const action = parseNotificationEvent(routingKey, rawMessage);
 
-          
-          let user;
-          
-          if (eventData.payload) {
-            
-            user = typeof eventData.payload === 'string' ? JSON.parse(eventData.payload) : eventData.payload;
-          } else {
-            
-            user = eventData;
-          }
-
-          
-          if (!user || !user.email) {
-            console.error(" ERROR: Invalid user data received:", user);
-            channel.ack(message); 
+          if (!action) {
+            console.error('ERROR: Invalid notification event payload:', rawMessage);
+            channel.ack(message);
             return;
           }
 
           console.log('=======================================');
-          console.log(' [NEW EVENT TRIGGERED] ');
-          console.log('Action: Simulating Welcome Email');
-          console.log(`To: ${user.email}`);
-          console.log(`Name: ${user.name}`);
+          console.log(` [NEW EVENT TRIGGERED: ${action.type}] `);
+          console.log(`Recipient: ${action.recipient}`);
+          console.log(`Summary: ${action.summary}`);
           console.log('=======================================');
 
-          setTimeout(() => {
-            console.log(` Welcome email successfully sent to ${user.email}!`);
-            channel.ack(message);
-          }, 2000);
-
+          channel.ack(message);
         } catch (err) {
-          console.error(" Erro ao processar a mensagem:", err);
-          channel.ack(message); 
+          console.error('Erro ao processar a mensagem:', err);
+          channel.ack(message);
         }
       }
     });
-
   } catch (error) {
-    console.error(" Failed to start Notification Service:", error);
+    console.error('Failed to start Notification Service:', error);
   }
 }
 
-startConsumer();
+if (process.env.NODE_ENV !== 'test') {
+  void startConsumer();
+}

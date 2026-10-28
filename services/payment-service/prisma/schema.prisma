@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  orderId       String   @unique
+  userId        String
+  amount        Float
+  status        String   @default("APPROVED")
+  failureReason String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@map("payments")
+}
+
+model Outbox {
+  id            String   @id @default(uuid())
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json
+  published     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@map("outbox")
+}
+
+model ProcessedMessage {
+  messageId   String   @id
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@map("processed_messages")
+}
