@@ -1,6 +1,6 @@
 # Docs — Guia para Agentes de Desenvolvimento
 
-Este diretório é a **fonte de verdade** para qualquer agente (ou dev) que trabalhe neste monorepo. Leia na ordem abaixo antes de alterar código.
+Este diretório é a **fonte de verdade** para qualquer agente (ou dev) que trabalhe neste monorepo — e também funciona diretamente como um **Vault do Obsidian** (`docs/.obsidian/`). Leia na ordem abaixo antes de alterar código.
 
 | # | Documento | Para que serve |
 |---|-----------|----------------|
@@ -12,7 +12,7 @@ Este diretório é a **fonte de verdade** para qualquer agente (ou dev) que trab
 | 06 | [06-fluxo-solid-e-seguranca.md](./06-fluxo-solid-e-seguranca.md) | **Como os agentes trabalham**: branch + PR + testes como gate de merge, SOLID, segurança (SQL injection, CORS, rate limit, load balancer…) |
 | 07 | [07-orquestracao-de-agentes.md](./07-orquestracao-de-agentes.md) | **Orquestração Multi-Agente por Tarefa**: pipeline de execução, matriz das próximas fases e protocolo de handoff |
 
-## Perfis dos Agentes Especialistas (`docs/agents/`)
+## Perfis dos 5 Agentes Especialistas (`docs/agents/`)
 
 | Agente | Arquivo | Responsabilidade |
 |---|---|---|
@@ -20,10 +20,12 @@ Este diretório é a **fonte de verdade** para qualquer agente (ou dev) que trab
 | **Backend (`agent-backend`)** | [agents/agent-backend.md](./agents/agent-backend.md) | Microsserviços Fastify/TypeScript em Clean Architecture, SOLID, RabbitMQ Saga, JWT/RBAC e Nginx Gateway |
 | **Frontend (`agent-frontend`)** | [agents/agent-frontend.md](./agents/agent-frontend.md) | React 19/Vite/Tailwind (Stitch Design), integração de APIs e isolamento `<DevOnly>` vs. Produção Limpa |
 | **Testes & QA (`agent-qa-tests`)** | [agents/agent-qa-tests.md](./agents/agent-qa-tests.md) | Testes unitários Vitest (Fakes In-Memory), testes de segurança/contratos, pipeline CI e Quality Gate de PR |
+| **Grafo & Obsidian (`agent-graph`)** | [agents/agent-graph.md](./agents/agent-graph.md) | Atualização contínua do Grafo de Conhecimento (`graphify-out/`), Vault Obsidian (`docs/obsidian/`) e análise de impacto arquitetural |
 
 ## Regras de manutenção
 - Ao concluir uma tarefa, **atualize o checklist** em `02-planejamento-roadmap.md`.
 - Ao criar/alterar endpoint ou evento, **atualize** `04-contratos-api-e-eventos.md` no mesmo PR.
+- Antes de abrir qualquer PR, execute `npm run graph:update` (`agent-graph`) para manter `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e o Vault Obsidian (`docs/obsidian/`) sincronizados.
 - Se um doc divergir do código, o código vence — corrija o doc.
 
 ## Comandos rápidos
@@ -34,5 +36,8 @@ docker compose logs -f <svc>  # logs
 docker compose up -d --build <svc>   # rebuild de um serviço
 npm run build                 # builda todos os serviços e o frontend
 npm test                      # roda todos os testes unitários do monorepo
+npm run graph:update          # atualiza o grafo Graphify + exporta Vault Obsidian (docs/obsidian) e HTML
+npm run graph:explain -- <Nó> # mostra vizinhança e conexões de um símbolo no grafo
+npm run graph:path -- <A> <B> # mostra o menor caminho arquitetural entre dois nós
 ```
 Portas no host: user `3000`, catalog `3001`, frontend `3002`, API Gateway `8080`, Postgres `5434` (5432 do host está ocupada), Mongo `27017`, RabbitMQ `5672`/`15672`.

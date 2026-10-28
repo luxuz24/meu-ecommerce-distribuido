@@ -16,6 +16,9 @@
     "build:outbox": "npm --prefix services/user-outbox-processor run build",
     "build:notification": "npm --prefix services/notification-service run build",
     "build:frontend": "npm --prefix frontend run build",
-    "build": "npm run build:user && npm run build:catalog && npm run build:outbox && npm run build:notification && npm run build:frontend"
+    "build": "npm run build:user && npm run build:catalog && npm run build:outbox && npm run build:notification && npm run build:frontend",
+    "graph:update": "PATH=\"$HOME/.local/bin:$PATH\" graphify update . --force && PATH=\"$HOME/.local/bin:$PATH\" graphify export obsidian --dir docs/obsidian && PATH=\"$HOME/.local/bin:$PATH\" graphify export html",
+    "graph:explain": "PATH=\"$HOME/.local/bin:$PATH\" graphify explain",
+    "graph:path": "PATH=\"$HOME/.local/bin:$PATH\" graphify path"
   }
 }
