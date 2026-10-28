@@ -222,8 +222,8 @@
     "semantic_hash": ""
   },
   "services/catalog-service/src/server.ts": {
-    "mtime": 1793201405.8958056,
-    "seen": 1793201527.9342268,
+    "mtime": 1793203351.7537308,
+    "seen": 1793203425.5834818,
     "ast_hash": "4d3ef88719abb0303a3067376b5159f8",
     "semantic_hash": ""
   },
@@ -276,14 +276,14 @@
     "semantic_hash": ""
   },
   "services/notification-service/src/index.ts": {
-    "mtime": 1793201306.7860615,
-    "seen": 1793201527.9343665,
+    "mtime": 1793203351.754362,
+    "seen": 1793203425.5835326,
     "ast_hash": "1a5540369e141a575c4f755be2e4fb44",
     "semantic_hash": ""
   },
   "services/notification-service/src/notification.test.ts": {
-    "mtime": 1793201447.1232898,
-    "seen": 1793201527.9343703,
+    "mtime": 1793203351.754362,
+    "seen": 1793203425.5835338,
     "ast_hash": "cb05b002a802fc93ff12a370173845e2",
     "semantic_hash": ""
   },
@@ -420,8 +420,8 @@
     "semantic_hash": ""
   },
   "services/user-service/src/server.ts": {
-    "mtime": 1793201403.004842,
-    "seen": 1793201527.9344885,
+    "mtime": 1793203351.755362,
+    "seen": 1793203425.5837479,
     "ast_hash": "fda838cb90b11345f45b7d49d33be401",
     "semantic_hash": ""
   },
@@ -480,9 +480,9 @@
     "semantic_hash": ""
   },
   "docs/02-planejamento-roadmap.md": {
-    "mtime": 1793201469.2640142,
-    "seen": 1793201527.9345045,
-    "ast_hash": "d6a3449632e6e1fd5503c448f0ac095e",
+    "mtime": 1793203395.4156942,
+    "seen": 1793203425.5838003,
+    "ast_hash": "8658015d2461493e0b20066bc29550b7",
     "semantic_hash": ""
   },
   "docs/03-convencoes-e-regras-para-agentes.md": {
@@ -498,9 +498,9 @@
     "semantic_hash": ""
   },
   "docs/05-frontend-plano.md": {
-    "mtime": 1793189347.8041656,
-    "seen": 1793192426.0437417,
-    "ast_hash": "fda41ca758bcbb67304b06ccab3b8b49",
+    "mtime": 1793203387.4038165,
+    "seen": 1793203425.5838153,
+    "ast_hash": "15af50285d67bcae15b3e6e33a3a7c59",
     "semantic_hash": ""
   },
   "docs/06-fluxo-solid-e-seguranca.md": {
@@ -654,14 +654,14 @@
     "semantic_hash": ""
   },
   "services/inventory-service/src/infra/messaging/InventoryEventWorker.ts": {
-    "mtime": 1793201343.071599,
-    "seen": 1793201527.9343252,
+    "mtime": 1793203351.7537308,
+    "seen": 1793203425.583517,
     "ast_hash": "6e1074bc0d331bcc496990fb1fb87063",
     "semantic_hash": ""
   },
   "services/inventory-service/src/server.ts": {
-    "mtime": 1793201408.102778,
-    "seen": 1793201527.934329,
+    "mtime": 1793203351.7537308,
+    "seen": 1793203425.583519,
     "ast_hash": "320a7f584c75e6e161ba68dbcd4e4e5d",
     "semantic_hash": ""
   },
@@ -786,14 +786,14 @@
     "semantic_hash": ""
   },
   "services/order-service/src/infra/messaging/OrderEventWorker.ts": {
-    "mtime": 1793201344.9735749,
-    "seen": 1793201527.934414,
+    "mtime": 1793203351.7548325,
+    "seen": 1793203425.5835574,
     "ast_hash": "6e30d4bfb46852bc51902c055df5e605",
     "semantic_hash": ""
   },
   "services/order-service/src/server.ts": {
-    "mtime": 1793201409.4037616,
-    "seen": 1793201527.9344153,
+    "mtime": 1793203351.7548325,
+    "seen": 1793203425.5835586,
     "ast_hash": "da9b30094a258d36d320e193e29d5361",
     "semantic_hash": ""
   },
@@ -894,14 +894,14 @@
     "semantic_hash": ""
   },
   "services/payment-service/src/infra/messaging/PaymentEventWorker.ts": {
-    "mtime": 1793201346.233559,
-    "seen": 1793201527.9344423,
+    "mtime": 1793203351.7548325,
+    "seen": 1793203425.5836174,
     "ast_hash": "0103d7f5f3254fd2ffdf61751cdae050",
     "semantic_hash": ""
   },
   "services/payment-service/src/server.ts": {
-    "mtime": 1793201411.1737394,
-    "seen": 1793201527.9344437,
+    "mtime": 1793203351.7548325,
+    "seen": 1793203425.583622,
     "ast_hash": "84f4a5a9f96008ffe38686311e16f7e8",
     "semantic_hash": ""
   },
