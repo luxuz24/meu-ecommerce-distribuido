@@ -1,10 +1,12 @@
 import { type FastifyInstance } from 'fastify';
 import { productController } from '../../container.js';
+import { requireAdminAuth } from '../middlewares/AuthMiddleware.js';
 
 export async function productRoutes(app: FastifyInstance) {
   app.post(
     '/products',
     {
+      preHandler: [requireAdminAuth],
       schema: {
         body: {
           type: 'object',
@@ -68,6 +70,7 @@ export async function productRoutes(app: FastifyInstance) {
   app.patch(
     '/products/:id',
     {
+      preHandler: [requireAdminAuth],
       schema: {
         params: {
           type: 'object',
@@ -99,6 +102,7 @@ export async function productRoutes(app: FastifyInstance) {
   app.delete(
     '/products/:id',
     {
+      preHandler: [requireAdminAuth],
       schema: {
         params: {
           type: 'object',

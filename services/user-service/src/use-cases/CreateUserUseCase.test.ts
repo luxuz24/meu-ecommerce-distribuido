@@ -23,6 +23,7 @@ class InMemoryUserRepository implements IUserRepository {
       name: data.name,
       email: data.email,
       password: data.passwordHash,
+      role: data.role ?? 'CUSTOMER',
       createdAt: new Date(),
     });
     this.users.push(user);
@@ -42,7 +43,7 @@ class FakePasswordHasher implements IPasswordHasher {
 }
 
 describe('CreateUserUseCase', () => {
-  it('should create a new user and generate outbox event', async () => {
+  it('should create a new user with default CUSTOMER role and generate outbox event', async () => {
     const userRepository = new InMemoryUserRepository();
     const passwordHasher = new FakePasswordHasher();
     const useCase = new CreateUserUseCase(userRepository, passwordHasher);
@@ -52,11 +53,22 @@ describe('CreateUserUseCase', () => {
     expect(result.id).toBeDefined();
     expect(result.name).toBe('Lucas Ortiz');
     expect(result.email).toBe('lucas@example.com');
+    expect(result.role).toBe('CUSTOMER');
     expect((result as any).password).toBeUndefined();
 
     expect(userRepository.users).toHaveLength(1);
     expect(userRepository.outboxEvents).toHaveLength(1);
     expect(userRepository.outboxEvents[0]?.eventType).toBe('USER_CREATED');
+  });
+
+  it('should create an ADMIN user when role ADMIN is passed', async () => {
+    const userRepository = new InMemoryUserRepository();
+    const passwordHasher = new FakePasswordHasher();
+    const useCase = new CreateUserUseCase(userRepository, passwordHasher);
+
+    const result = await useCase.execute('Admin User', 'admin@example.com', 'password123', 'ADMIN');
+
+    expect(result.role).toBe('ADMIN');
   });
 
   it('should throw UserAlreadyExistsError when email is already registered', async () => {

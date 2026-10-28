@@ -24,6 +24,7 @@ export class PrismaUserRepository implements IUserRepository {
           name: data.name,
           email: data.email,
           password: data.passwordHash,
+          role: data.role ?? 'CUSTOMER',
         },
       });
 
@@ -36,6 +37,7 @@ export class PrismaUserRepository implements IUserRepository {
             id: user.id,
             name: user.name,
             email: user.email,
+            role: user.role,
             ...outbox.payload,
           },
         },

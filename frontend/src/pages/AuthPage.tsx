@@ -24,6 +24,7 @@ export const AuthPage: React.FC = () => {
   const [regName, setRegName] = useState('Lucas Silva');
   const [regEmail, setRegEmail] = useState('dev@microstore.io');
   const [regPassword, setRegPassword] = useState('Micro@2026');
+  const [regRole, setRegRole] = useState<'CUSTOMER' | 'ADMIN'>('ADMIN');
   const [showRegPass, setShowRegPass] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -71,6 +72,7 @@ export const AuthPage: React.FC = () => {
         name: regName.trim(),
         email: regEmail.trim(),
         password: regPassword,
+        role: regRole,
       });
       setTelemetry(res.telemetry);
       setSuccessMessage(
@@ -476,6 +478,41 @@ export const AuthPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            <DevOnly>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between">
+                  <span>Role / Permissão de Acesso</span>
+                  <span className="font-code-sm text-code-sm text-on-surface-variant">
+                    payload.role
+                  </span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRegRole('CUSTOMER')}
+                    className={`py-2 px-3 rounded-lg font-code-sm text-code-sm border transition-all ${
+                      regRole === 'CUSTOMER'
+                        ? 'bg-primary text-on-primary border-primary font-semibold'
+                        : 'bg-surface-container-low text-on-surface-variant border-surface-container-high'
+                    }`}
+                  >
+                    CUSTOMER (Padrão)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRegRole('ADMIN')}
+                    className={`py-2 px-3 rounded-lg font-code-sm text-code-sm border transition-all ${
+                      regRole === 'ADMIN'
+                        ? 'bg-primary text-on-primary border-primary font-semibold'
+                        : 'bg-surface-container-low text-on-surface-variant border-surface-container-high'
+                    }`}
+                  >
+                    ADMIN (Mutações Catálogo)
+                  </button>
+                </div>
+              </div>
+            </DevOnly>
 
             <button
               type="submit"

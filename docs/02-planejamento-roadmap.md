@@ -39,10 +39,10 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ CI GitHub Actions (.github/workflows/ci.yml: matrix build, prisma, test, docker build) + proteção da `main` (configuração no GitHub)
 - ✅ `@fastify/helmet`, `@fastify/cors` (allowlist via `CORS_ORIGINS`), `@fastify/rate-limit` em user e catalog
 - ✅ Schemas de validação (`additionalProperties:false`) e sanitização Mongo (`sanitizeFilter`)
-- ⬜ Nginx/Traefik como gateway + load balancer (réplicas, health checks, rate limit, TLS)
+- ✅ Nginx como API Gateway + Load Balancer (`gateway/nginx.conf` na porta `:8080`, `least_conn`, health checks, rate limit)
 - ⬜ Containers non-root, remover `container_name`/portas fixas dos serviços escaláveis
 - ⬜ Rotacionar segredos de dev; scan de segredos e de imagens no CI
-- ✅ Testes unitários dos use cases (user e catalog) e parsers dos workers (15 testes passando)
+- ✅ Testes unitários dos use cases (user, catalog, frontend) e parsers dos workers (24 testes passando)
 
 ### Fase 1 — Clean Architecture no user-service
 - ✅ Criar `domain/` (`User`, `IUserRepository`, `IPasswordHasher`, `ITokenService`)
@@ -55,15 +55,15 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ Mover DTOs/interfaces para `domain/`; composition root (`infra/container.ts`)
 - ✅ `GET /api/products` (paginação, filtro por nome/SKU e status ativo), `GET /api/products/:id`
 - ✅ `PATCH /api/products/:id`, `DELETE /api/products/:id` (soft via `isActive`)
-- ⬜ Proteger escrita por JWT (role admin — ver Fase 3)
+- ✅ Proteger escrita por JWT (role `ADMIN` via `requireAdminAuth` — Fase 3)
 - ✅ Schemas Fastify (validação de body, params e querystring)
 - ⬜ Outbox no catálogo (ou publisher direto) para eventos `PRODUCT_CREATED/UPDATED`
 
 ### Fase 3 — Autorização e identidade
-- ⬜ Campo `role` (`CUSTOMER`/`ADMIN`) em `User` + migration
+- ✅ Campo `role` (`CUSTOMER`/`ADMIN`) em `User` + migration Prisma + claims no JWT
 - ⬜ Refresh token / logout (decidir escopo)
-- ⬜ Middleware JWT compartilhável (pacote ou cópia padronizada) para outros serviços
-- ⬜ Definir API Gateway ou BFF (ver `05-frontend-plano.md`)
+- ✅ Middleware JWT padronizado (`requireAdminAuth` no `catalog-service`) validando algoritmo `HS256` e role `ADMIN`
+- ✅ API Gateway Nginx (`gateway/nginx.conf` em `http://localhost:8080`) roteando `/users`, `/login` e `/api/products`
 
 ### Fase 4 — Novos serviços (bancos já provisionados)
 - ⬜ **inventory-service** (`inventory_db`): estoque/reservas; consome `ORDER_CREATED`, emite `STOCK_RESERVED`/`STOCK_REJECTED`

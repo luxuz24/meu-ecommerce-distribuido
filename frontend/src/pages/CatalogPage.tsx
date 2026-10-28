@@ -11,7 +11,7 @@ import type {
   PaginatedProducts,
   Product,
 } from '../domain/types';
-import { ApiError, catalogApi } from '../services/api';
+import { ApiError, catalogApi, userApi } from '../services/api';
 
 const DEMO_SEED_PRODUCTS: CreateProductInput[] = [
   {
@@ -116,9 +116,32 @@ export const CatalogPage: React.FC = () => {
 
   const handleSeedDemoProducts = async () => {
     setSeeding(true);
+    let adminToken = localStorage.getItem('microstore_jwt_token');
+    if (!adminToken) {
+      try {
+        await userApi.register({
+          name: 'Admin Seeder',
+          email: 'admin@microstore.io',
+          password: 'AdminPassword123',
+          role: 'ADMIN',
+        });
+      } catch {
+        // Ignore if already exists
+      }
+      try {
+        const loginRes = await userApi.login({
+          email: 'admin@microstore.io',
+          password: 'AdminPassword123',
+        });
+        adminToken = loginRes.data.tokenJwt;
+      } catch {
+        // Ignore
+      }
+    }
+
     for (const item of DEMO_SEED_PRODUCTS) {
       try {
-        await catalogApi.createProduct(item);
+        await catalogApi.createProduct(item, adminToken);
       } catch {
         // Ignora caso o SKU já exista no banco
       }

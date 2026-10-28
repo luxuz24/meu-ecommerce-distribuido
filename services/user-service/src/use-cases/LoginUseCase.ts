@@ -1,3 +1,4 @@
+import { type UserRole } from '../domain/entities/User.js';
 import { type IUserRepository } from '../domain/repositories/IUserRepository.js';
 import { type IPasswordHasher } from '../domain/services/IPasswordHasher.js';
 import { type ITokenService } from '../domain/services/ITokenService.js';
@@ -14,6 +15,7 @@ export interface LoginUserResponse {
     id: string;
     name: string;
     email: string;
+    role: UserRole;
   };
 }
 
@@ -40,6 +42,7 @@ export class LoginUserUseCase {
     const tokenJwt = this.tokenService.generateToken({
       userId: user.id,
       email: user.email,
+      role: user.role,
     });
 
     return {
@@ -48,6 +51,7 @@ export class LoginUserUseCase {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
       },
     };
   }
