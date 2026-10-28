@@ -131,8 +131,6 @@ npm run seed:demo
 | **Living Architecture Showcase** | [http://localhost:3002/architecture](http://localhost:3002/architecture) | Laboratório interativo explicativo da arquitetura |
 | **API Gateway Nginx** | [http://localhost:8080](http://localhost:8080) | Ponto único de entrada com rate limit e proxy |
 | **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | Fila de eventos (Login: `guest` / `guest`) |
-| **Grafo Interativo (HTML)** | `graphify-out/graph.html` | Grafo de conhecimento de código estático (abra no navegador) |
-| **Obsidian Knowledge Vault** | `docs/obsidian/` | Pasta pronta para abrir como cofre no aplicativo Obsidian |
 
 ---
 
@@ -143,18 +141,10 @@ O projeto conta com **44 testes unitários automatizados** em Vitest com Fakes I
 ```bash
 # Rodar todos os testes do monorepo
 npm test
-
-# Atualizar o grafo de conhecimento após alterações
-npm run graph:update
 ```
 
 ---
 
-## 👥 Orquestração Multi-Agente
+## 📄 Licença
 
-O desenvolvimento deste ecossistema segue o protocolo documentado em [`docs/07-orquestracao-de-agentes.md`](./docs/07-orquestracao-de-agentes.md), distribuído entre 5 agentes especialistas:
-1. `agent-database`: Modelagem Prisma/Mongoose, outbox e migrações.
-2. `agent-backend`: Clean Architecture, use cases puros e consumidores RabbitMQ.
-3. `agent-frontend`: UI React 19, telemetria isolada em `<DevOnly>` e visual minimalista.
-4. `agent-qa-tests`: Testes unitários com Fakes e validação da pipeline CI.
-5. `agent-graph`: Manutenção do Grafo de Conhecimento e Vault Obsidian.
+Distribuído sob a licença MIT. Veja `LICENSE` para mais detalhes.

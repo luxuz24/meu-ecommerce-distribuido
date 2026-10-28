@@ -55,6 +55,11 @@ export class UpdateOrderStatusUseCase {
 
     if (input.eventType === 'PAYMENT_APPROVED') {
       if (existing.status === 'PAID') return existing;
+      // Guard: CANCELLED order must NEVER transition to PAID! Only PENDING or STOCK_RESERVED can be paid.
+      if (existing.status === 'CANCELLED') {
+        console.warn(`[order-service] Ignored PAYMENT_APPROVED on already CANCELLED order ${existing.id}`);
+        return existing;
+      }
       return this.orderRepository.updateStatusWithOutbox({
         orderId: input.orderId,
         status: 'PAID',

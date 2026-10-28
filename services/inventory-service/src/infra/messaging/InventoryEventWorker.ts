@@ -53,10 +53,15 @@ export async function startInventoryMessaging(
         await reserveStockUseCase.execute({
           messageId: String(messageId),
           orderId: String(payload.orderId),
+          ...(payload.userId ? { userId: String(payload.userId) } : {}),
+          ...(typeof payload.total === 'number' ? { total: payload.total } : {}),
+          ...(payload.simulateOutcome ? { simulateOutcome: payload.simulateOutcome } : {}),
           items: Array.isArray(payload.items)
-            ? payload.items.map((i: { sku: string; quantity?: number; qty?: number }) => ({
+            ? payload.items.map((i: { sku: string; quantity?: number; qty?: number; price?: number; name?: string }) => ({
                 sku: String(i.sku),
                 quantity: Number(i.quantity ?? i.qty ?? 1),
+                ...(typeof i.price === 'number' ? { price: i.price } : {}),
+                ...(i.name ? { name: String(i.name) } : {}),
               }))
             : [],
         });

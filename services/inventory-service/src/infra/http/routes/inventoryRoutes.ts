@@ -54,6 +54,7 @@ export async function registerInventoryRoutes(
   }>(
     '/inventory/reserve',
     {
+      preHandler: [requireAdminAuth],
       schema: {
         body: {
           type: 'object',
@@ -89,6 +90,7 @@ export async function registerInventoryRoutes(
   }>(
     '/inventory/release/:orderId',
     {
+      preHandler: [requireAdminAuth],
       schema: {
         params: {
           type: 'object',

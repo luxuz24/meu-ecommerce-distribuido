@@ -28,6 +28,7 @@ export class OrderController {
           price: number;
           quantity: number;
         }>;
+        simulateOutcome?: 'APPROVED' | 'FAILED';
       };
     }>,
     reply: FastifyReply
@@ -40,6 +41,7 @@ export class OrderController {
     const order = await this.createOrderUseCase.execute({
       userId: request.authUser.userId,
       items: request.body.items,
+      ...(request.body.simulateOutcome ? { simulateOutcome: request.body.simulateOutcome } : {}),
     });
 
     reply.status(201).send(order);
