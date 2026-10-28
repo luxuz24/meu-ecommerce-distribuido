@@ -1,6 +1,6 @@
 import { type FastifyInstance } from 'fastify';
 import { type OrderController } from '../controllers/OrderController.js';
-import { requireUserAuth } from '../middlewares/AuthMiddleware.js';
+import { requireAdminAuth, requireUserAuth } from '../middlewares/AuthMiddleware.js';
 import { type OrderSagaEventType } from '../../../use-cases/UpdateOrderStatusUseCase.js';
 
 export async function registerOrderRoutes(
@@ -16,6 +16,7 @@ export async function registerOrderRoutes(
         price: number;
         quantity: number;
       }>;
+      simulateOutcome?: 'APPROVED' | 'FAILED';
     };
   }>(
     '/orders',
@@ -27,6 +28,10 @@ export async function registerOrderRoutes(
           required: ['items'],
           additionalProperties: false,
           properties: {
+            simulateOutcome: {
+              type: 'string',
+              enum: ['APPROVED', 'FAILED'],
+            },
             items: {
               type: 'array',
               minItems: 1,
@@ -87,7 +92,7 @@ export async function registerOrderRoutes(
   }>(
     '/orders/:id/saga-event',
     {
-      preHandler: [requireUserAuth],
+      preHandler: [requireAdminAuth],
       schema: {
         params: {
           type: 'object',

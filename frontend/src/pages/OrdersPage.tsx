@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import type { ApiTelemetryRecord, Order, OrderStatus } from '../domain/types';
-import { ApiError, inventoryApi, orderApi, paymentApi } from '../services/api';
+import { ApiError, orderApi } from '../services/api';
 import { formatBRL } from './CatalogPage';
 
 function statusBadgeStyle(status: OrderStatus): {
@@ -46,6 +46,7 @@ export const OrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submittingCheckout, setSubmittingCheckout] = useState(false);
+  const [simulateFailure, setSimulateFailure] = useState(false);
   const [telemetry, setTelemetry] = useState<ApiTelemetryRecord | null>(null);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
@@ -87,6 +88,7 @@ export const OrdersPage: React.FC = () => {
     try {
       const res = await orderApi.createOrder(
         {
+          simulateOutcome: simulateFailure ? 'FAILED' : 'APPROVED',
           items: items.map((i) => ({
             productId: i.product.id,
             sku: i.product.sku,
@@ -101,7 +103,7 @@ export const OrdersPage: React.FC = () => {
       clearCart();
       setFeedback({
         type: 'success',
-        message: `Pedido #${res.data.id.slice(0, 8)} criado (PENDING) e evento ORDER_CREATED gravado na Outbox!`,
+        message: `Pedido #${res.data.id.slice(0, 8)} criado (PENDING)! A Saga Coreografada está processando no RabbitMQ...`,
       });
       await fetchOrders();
     } catch (err) {
@@ -119,75 +121,6 @@ export const OrdersPage: React.FC = () => {
       }
     } finally {
       setSubmittingCheckout(false);
-    }
-  };
-
-  const handleSimulateSagaStep = async (
-    order: Order,
-    eventType:
-      | 'STOCK_RESERVED'
-      | 'STOCK_REJECTED'
-      | 'PAYMENT_APPROVED'
-      | 'PAYMENT_FAILED'
-  ) => {
-    setFeedback(null);
-    try {
-      if (eventType === 'STOCK_RESERVED') {
-        try {
-          await inventoryApi.reserveOrderStock({
-            orderId: order.id,
-            items: order.items.map((i) => ({
-              sku: i.sku,
-              quantity: i.quantity,
-            })),
-          });
-        } catch {
-          // Ignore if inventory-service is handled via RabbitMQ
-        }
-      }
-      if (eventType === 'PAYMENT_APPROVED' || eventType === 'PAYMENT_FAILED') {
-        try {
-          await paymentApi.processPayment({
-            orderId: order.id,
-            userId: order.userId,
-            amount: order.total,
-            simulateOutcome:
-              eventType === 'PAYMENT_APPROVED' ? 'APPROVED' : 'FAILED',
-            ...(eventType === 'PAYMENT_FAILED'
-              ? { failureReason: 'CARD_DECLINED_SIMULATION' }
-              : {}),
-          });
-        } catch {
-          // Ignore if payment-service is handled via RabbitMQ
-        }
-      }
-      const res = await orderApi.triggerSagaEvent(
-        order.id,
-        {
-          eventType,
-          ...(eventType === 'STOCK_REJECTED'
-            ? { reason: 'INSUFFICIENT_STOCK_SIMULATION' }
-            : {}),
-          ...(eventType === 'PAYMENT_FAILED'
-            ? { reason: 'CARD_DECLINED_SIMULATION' }
-            : {}),
-        },
-        token
-      );
-      setTelemetry(res.telemetry);
-      setFeedback({
-        type: 'success',
-        message: `Evento da Saga ${eventType} aplicado ao pedido #${order.id.slice(0, 8)} → Status: ${res.data.status}`,
-      });
-      await fetchOrders();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setFeedback({
-          type: 'error',
-          message: `${err.statusCode} — ${err.message}`,
-        });
-        setTelemetry(err.telemetry);
-      }
     }
   };
 
@@ -344,6 +277,20 @@ export const OrdersPage: React.FC = () => {
                   </span>
                 </div>
 
+                <DevOnly>
+                  <label className="flex items-center gap-2 p-2.5 rounded-lg border border-surface-container bg-surface-container-lowest cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={simulateFailure}
+                      onChange={(e) => setSimulateFailure(e.target.checked)}
+                      className="w-4 h-4 rounded text-error focus:ring-error"
+                    />
+                    <span className="font-code-sm text-code-sm text-on-surface">
+                      Simular Falha de Pagamento (Testar Compensação da Saga)
+                    </span>
+                  </label>
+                </DevOnly>
+
                 {!user ? (
                   <Link
                     to="/auth"
@@ -458,53 +405,14 @@ export const OrdersPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Controles de Simulação da Saga Coreografada (Exclusivo Dev Mode) */}
+                  {/* Controles e Informações da Saga Coreografada */}
                   <DevOnly>
-                    <div className="border-t border-surface-container pt-2 flex flex-col gap-1.5">
-                      <span className="font-code-sm text-code-sm text-on-surface-variant">
-                        Simular Eventos da Saga Coreografada (RabbitMQ / HTTP):
+                    <div className="border-t border-surface-container pt-2 flex items-center justify-between text-on-surface-variant font-code-sm text-code-sm">
+                      <span className="flex items-center gap-1 text-primary">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                        Saga processada exclusivamente via RabbitMQ (Event-Driven)
                       </span>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleSimulateSagaStep(order, 'STOCK_RESERVED')
-                          }
-                          className="px-2 py-1 rounded bg-secondary-container text-on-secondary-container font-code-sm text-code-sm"
-                        >
-                          1. STOCK_RESERVED
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleSimulateSagaStep(
-                              order,
-                              'PAYMENT_APPROVED'
-                            )
-                          }
-                          className="px-2 py-1 rounded bg-tertiary text-on-tertiary font-code-sm text-code-sm"
-                        >
-                          2. PAYMENT_APPROVED
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleSimulateSagaStep(order, 'STOCK_REJECTED')
-                          }
-                          className="px-2 py-1 rounded bg-error-container text-on-error-container font-code-sm text-code-sm"
-                        >
-                          STOCK_REJECTED
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleSimulateSagaStep(order, 'PAYMENT_FAILED')
-                          }
-                          className="px-2 py-1 rounded bg-error-container text-on-error-container font-code-sm text-code-sm"
-                        >
-                          PAYMENT_FAILED
-                        </button>
-                      </div>
+                      <span>Order #{order.id.slice(0, 8)}</span>
                     </div>
                   </DevOnly>
                 </article>

@@ -156,7 +156,17 @@ export class PrismaInventoryRepository implements IInventoryRepository {
           payload: {
             orderId: input.orderId,
             reservationId: reservationRow.id,
-            items: input.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
+            ...(input.userId !== undefined ? { userId: input.userId } : {}),
+            ...(input.total !== undefined ? { total: input.total } : {}),
+            ...(input.simulateOutcome !== undefined
+              ? { simulateOutcome: input.simulateOutcome }
+              : {}),
+            items: input.items.map((i) => ({
+              sku: i.sku,
+              quantity: i.quantity,
+              ...(i.price !== undefined ? { price: i.price } : {}),
+              ...(i.name !== undefined ? { name: i.name } : {}),
+            })),
           },
         },
       });

@@ -305,6 +305,7 @@ export const orderApi = {
         price: number;
         quantity: number;
       }>;
+      simulateOutcome?: 'APPROVED' | 'FAILED';
     },
     token?: string | null
   ) =>

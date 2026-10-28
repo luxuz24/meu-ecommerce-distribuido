@@ -47,3 +47,22 @@ export async function requireUserAuth(request: FastifyRequest, reply: FastifyRep
     reply.status(401).send({ error: 'UNAUTHORIZED: Invalid or missing Bearer token' });
   }
 }
+
+export async function requireAdminAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    reply.status(500).send({ error: 'CRITICAL: JWT_SECRET not configured' });
+    return;
+  }
+
+  try {
+    const user = verifyOrderJwt(request.headers.authorization, secret);
+    if (user.role !== 'ADMIN') {
+      reply.status(403).send({ error: 'FORBIDDEN: Admin privileges required' });
+      return;
+    }
+    request.authUser = user;
+  } catch {
+    reply.status(401).send({ error: 'UNAUTHORIZED: Invalid or missing Bearer token' });
+  }
+}

@@ -10,6 +10,7 @@ export interface CreateOrderInput {
     price: number;
     quantity: number;
   }>;
+  simulateOutcome?: 'APPROVED' | 'FAILED';
 }
 
 export class CreateOrderUseCase {
@@ -48,6 +49,7 @@ export class CreateOrderUseCase {
         quantity: item.quantity,
       })),
       total: serverCalculatedTotal,
+      ...(input.simulateOutcome ? { simulateOutcome: input.simulateOutcome } : {}),
     });
   }
 }

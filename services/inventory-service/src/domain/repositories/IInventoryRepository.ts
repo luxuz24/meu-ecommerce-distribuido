@@ -10,7 +10,10 @@ export interface UpsertStockData {
 export interface ReserveOrderInput {
   messageId?: string;
   orderId: string;
-  items: ReservationItemEntry[];
+  userId?: string;
+  total?: number;
+  items: Array<ReservationItemEntry & { price?: number; name?: string }>;
+  simulateOutcome?: 'APPROVED' | 'FAILED';
 }
 
 export interface ReserveOrderResult {

@@ -38,6 +38,7 @@ export class PrismaOrderRepository implements IOrderRepository {
             orderId: created.id,
             userId: created.userId,
             total: created.total,
+            ...(data.simulateOutcome ? { simulateOutcome: data.simulateOutcome } : {}),
             items: created.items.map((item) => ({
               productId: item.productId,
               sku: item.sku,

@@ -29,9 +29,14 @@ export class ReserveStockUseCase {
     return this.inventoryRepository.reserveOrderStockWithOutbox({
       ...(input.messageId !== undefined ? { messageId: input.messageId } : {}),
       orderId: input.orderId,
+      ...(input.userId !== undefined ? { userId: input.userId } : {}),
+      ...(input.total !== undefined ? { total: input.total } : {}),
+      ...(input.simulateOutcome !== undefined ? { simulateOutcome: input.simulateOutcome } : {}),
       items: input.items.map((item) => ({
         sku: item.sku.trim().toUpperCase(),
         quantity: item.quantity,
+        ...(item.price !== undefined ? { price: item.price } : {}),
+        ...(item.name !== undefined ? { name: item.name } : {}),
       })),
     });
   }
