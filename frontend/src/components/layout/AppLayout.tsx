@@ -90,6 +90,17 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
                   Admin Produtos
                 </Link>
                 <Link
+                  to="/architecture"
+                  className={`px-3 py-1.5 rounded-lg font-label-md text-label-md transition-colors flex items-center gap-1.5 ${
+                    location.pathname === '/architecture'
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[17px]">account_tree</span>
+                  <span>Arquitetura Viva</span>
+                </Link>
+                <Link
                   to={user ? '/profile' : '/auth'}
                   className={`px-3 py-1.5 rounded-lg font-label-md text-label-md transition-colors ${
                     location.pathname.startsWith('/auth') ||
@@ -240,6 +251,20 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
               terminal
             </span>
             <span className="font-label-md text-label-md mt-0.5">Admin</span>
+          </Link>
+
+          <Link
+            to="/architecture"
+            className={`flex flex-col items-center justify-center min-w-[64px] min-h-[44px] transition-colors ${
+              location.pathname === '/architecture'
+                ? 'text-primary font-semibold'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[22px]">
+              account_tree
+            </span>
+            <span className="font-label-md text-label-md mt-0.5">Arquitetura</span>
           </Link>
 
           <Link
