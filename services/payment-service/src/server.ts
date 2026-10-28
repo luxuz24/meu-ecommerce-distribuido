@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { prisma } from './infra/database/prisma.js';
+import { runWithCorrelationId } from './infra/observability/correlation.js';
 import { paymentController, processPaymentUseCase } from './infra/container.js';
 import { registerPaymentRoutes } from './infra/http/routes/paymentRoutes.js';
 import { startPaymentMessaging } from './infra/messaging/PaymentEventWorker.js';
@@ -46,6 +47,11 @@ const start = async () => {
     await app.register(rateLimit, {
       max: 100,
       timeWindow: '1 minute',
+    });
+
+    // Toda escrita na outbox feita durante esta requisição herda o X-Correlation-ID do gateway
+    app.addHook('onRequest', (request, _reply, done) => {
+      runWithCorrelationId(request.id, done);
     });
 
     app.addHook('onSend', async (request, reply) => {

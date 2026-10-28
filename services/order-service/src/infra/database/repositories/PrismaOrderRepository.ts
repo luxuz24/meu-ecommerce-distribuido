@@ -1,4 +1,5 @@
 import { type PrismaClient } from '@prisma/client';
+import { currentCorrelationId } from '../../observability/correlation.js';
 import { Order, OrderItem, type OrderStatus } from '../../../domain/entities/Order.js';
 import {
   type CreateOrderData,
@@ -31,6 +32,7 @@ export class PrismaOrderRepository implements IOrderRepository {
 
       await tx.outbox.create({
         data: {
+          correlationId: currentCorrelationId(),
           aggregateType: 'Order',
           aggregateId: created.id,
           eventType: 'ORDER_CREATED',
@@ -166,6 +168,7 @@ export class PrismaOrderRepository implements IOrderRepository {
       if (data.outboxEvent) {
         await tx.outbox.create({
           data: {
+            correlationId: currentCorrelationId(),
             aggregateType: 'Order',
             aggregateId: updated.id,
             eventType: data.outboxEvent.eventType,

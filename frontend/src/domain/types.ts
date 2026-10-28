@@ -111,6 +111,7 @@ export interface ApiTelemetryRecord {
   service: string;
   statusCode: number;
   latencyMs: number;
+  correlationId?: string;
   responseBody: unknown;
   timestamp: string;
 }

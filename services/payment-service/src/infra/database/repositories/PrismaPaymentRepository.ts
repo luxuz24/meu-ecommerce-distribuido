@@ -1,4 +1,5 @@
 import { type PrismaClient } from '@prisma/client';
+import { currentCorrelationId } from '../../observability/correlation.js';
 import { Payment, type PaymentStatus } from '../../../domain/entities/Payment.js';
 import {
   type IPaymentRepository,
@@ -83,6 +84,7 @@ export class PrismaPaymentRepository implements IPaymentRepository {
 
       await tx.outbox.create({
         data: {
+          correlationId: currentCorrelationId(),
           aggregateType: 'Payment',
           aggregateId: upserted.id,
           eventType,

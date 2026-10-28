@@ -1,9 +1,10 @@
-import { type ConfirmChannel } from 'amqplib';
+import { type ConfirmChannel, type ConsumeMessage } from 'amqplib';
 import { type PrismaClient } from '@prisma/client';
 import { type ReserveStockUseCase } from '../../use-cases/ReserveStockUseCase.js';
 import { type ReleaseStockUseCase } from '../../use-cases/ReleaseStockUseCase.js';
 import { type ConfirmStockUseCase } from '../../use-cases/ConfirmStockUseCase.js';
 import { ResilientRabbitConnection, startOutboxRelay } from './ResilientRabbit.js';
+import { runWithCorrelationId } from '../observability/correlation.js';
 
 const EXCHANGE_NAME = 'ecommerce_events';
 const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
@@ -18,6 +19,13 @@ const SERVICE_NAME = 'inventory-service';
 function parsePayload(content: Buffer) {
   const raw = JSON.parse(content.toString());
   return raw.payload ? (typeof raw.payload === 'string' ? JSON.parse(raw.payload) : raw.payload) : raw;
+}
+
+/** Restaura o X-Correlation-ID da mensagem e registra a passagem do evento por este serviço. */
+async function traced(msg: ConsumeMessage, handler: () => Promise<void>): Promise<void> {
+  const correlationId = msg.properties.correlationId as string | undefined;
+  console.log(`[inventory-service] cid=${correlationId ?? '-'} <- ${msg.fields.routingKey}`);
+  await runWithCorrelationId(correlationId, handler);
 }
 
 export function startInventoryMessaging(
@@ -53,33 +61,35 @@ export function startInventoryMessaging(
     });
     await channel.bindQueue(ORDER_CREATED_QUEUE, EXCHANGE_NAME, 'order_created');
 
-    await channel.consume(ORDER_CREATED_QUEUE, async (msg) => {
+    await channel.consume(ORDER_CREATED_QUEUE, (msg) => {
       if (!msg) return;
-      try {
-        const payload = parsePayload(msg.content);
-        const messageId = msg.properties.messageId || payload.messageId || `order_${payload.orderId}`;
+      void traced(msg, async () => {
+        try {
+          const payload = parsePayload(msg.content);
+          const messageId = msg.properties.messageId || payload.messageId || `order_${payload.orderId}`;
 
-        await reserveStockUseCase.execute({
-          messageId: String(messageId),
-          orderId: String(payload.orderId),
-          ...(payload.userId ? { userId: String(payload.userId) } : {}),
-          ...(typeof payload.total === 'number' ? { total: payload.total } : {}),
-          ...(payload.simulateOutcome ? { simulateOutcome: payload.simulateOutcome } : {}),
-          items: Array.isArray(payload.items)
-            ? payload.items.map((i: { sku: string; quantity?: number; qty?: number; price?: number; name?: string }) => ({
-                sku: String(i.sku),
-                quantity: Number(i.quantity ?? i.qty ?? 1),
-                ...(typeof i.price === 'number' ? { price: i.price } : {}),
-                ...(i.name ? { name: String(i.name) } : {}),
-              }))
-            : [],
-        });
+          await reserveStockUseCase.execute({
+            messageId: String(messageId),
+            orderId: String(payload.orderId),
+            ...(payload.userId ? { userId: String(payload.userId) } : {}),
+            ...(typeof payload.total === 'number' ? { total: payload.total } : {}),
+            ...(payload.simulateOutcome ? { simulateOutcome: payload.simulateOutcome } : {}),
+            items: Array.isArray(payload.items)
+              ? payload.items.map((i: { sku: string; quantity?: number; qty?: number; price?: number; name?: string }) => ({
+                  sku: String(i.sku),
+                  quantity: Number(i.quantity ?? i.qty ?? 1),
+                  ...(typeof i.price === 'number' ? { price: i.price } : {}),
+                  ...(i.name ? { name: String(i.name) } : {}),
+                }))
+              : [],
+          });
 
-        channel.ack(msg);
-      } catch (err) {
-        console.error(`[${SERVICE_NAME}] Error processing order_created event:`, err);
-        channel.nack(msg, false, false);
-      }
+          channel.ack(msg);
+        } catch (err) {
+          console.error(`[${SERVICE_NAME}] Error processing order_created event:`, err);
+          channel.nack(msg, false, false);
+        }
+      });
     });
 
     // 2. Consumer: payment_failed (compensation)
@@ -92,18 +102,20 @@ export function startInventoryMessaging(
     });
     await channel.bindQueue(PAYMENT_FAILED_QUEUE, EXCHANGE_NAME, 'payment_failed');
 
-    await channel.consume(PAYMENT_FAILED_QUEUE, async (msg) => {
+    await channel.consume(PAYMENT_FAILED_QUEUE, (msg) => {
       if (!msg) return;
-      try {
-        const payload = parsePayload(msg.content);
-        const messageId = msg.properties.messageId || payload.messageId || `payfail_${payload.orderId}`;
+      void traced(msg, async () => {
+        try {
+          const payload = parsePayload(msg.content);
+          const messageId = msg.properties.messageId || payload.messageId || `payfail_${payload.orderId}`;
 
-        await releaseStockUseCase.execute(String(payload.orderId), String(messageId));
-        channel.ack(msg);
-      } catch (err) {
-        console.error(`[${SERVICE_NAME}] Error processing payment_failed event:`, err);
-        channel.nack(msg, false, false);
-      }
+          await releaseStockUseCase.execute(String(payload.orderId), String(messageId));
+          channel.ack(msg);
+        } catch (err) {
+          console.error(`[${SERVICE_NAME}] Error processing payment_failed event:`, err);
+          channel.nack(msg, false, false);
+        }
+      });
     });
 
     // 3. Consumer: order_confirmed (reserva vira baixa definitiva)
@@ -116,18 +128,20 @@ export function startInventoryMessaging(
     });
     await channel.bindQueue(ORDER_CONFIRMED_QUEUE, EXCHANGE_NAME, 'order_confirmed');
 
-    await channel.consume(ORDER_CONFIRMED_QUEUE, async (msg) => {
+    await channel.consume(ORDER_CONFIRMED_QUEUE, (msg) => {
       if (!msg) return;
-      try {
-        const payload = parsePayload(msg.content);
-        const messageId = msg.properties.messageId || payload.messageId || `confirmed_${payload.orderId}`;
+      void traced(msg, async () => {
+        try {
+          const payload = parsePayload(msg.content);
+          const messageId = msg.properties.messageId || payload.messageId || `confirmed_${payload.orderId}`;
 
-        await confirmStockUseCase.execute(String(payload.orderId), String(messageId));
-        channel.ack(msg);
-      } catch (err) {
-        console.error(`[${SERVICE_NAME}] Error processing order_confirmed event:`, err);
-        channel.nack(msg, false, false);
-      }
+          await confirmStockUseCase.execute(String(payload.orderId), String(messageId));
+          channel.ack(msg);
+        } catch (err) {
+          console.error(`[${SERVICE_NAME}] Error processing order_confirmed event:`, err);
+          channel.nack(msg, false, false);
+        }
+      });
     });
   };
 

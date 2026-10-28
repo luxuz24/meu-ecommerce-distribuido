@@ -135,6 +135,7 @@ interface OutboxRow {
   id: string;
   eventType: string;
   payload: unknown;
+  correlationId?: string | null;
 }
 
 interface OutboxStore {
@@ -177,7 +178,12 @@ export function startOutboxRelay(
           exchange,
           event.eventType.toLowerCase(),
           Buffer.from(JSON.stringify(event.payload)),
-          { persistent: true, messageId: event.id, contentType: 'application/json' }
+          {
+            persistent: true,
+            messageId: event.id,
+            contentType: 'application/json',
+            ...(event.correlationId ? { correlationId: event.correlationId } : {}),
+          }
         );
         await store.outbox.update({ where: { id: event.id }, data: { published: true } });
       }

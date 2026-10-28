@@ -1,7 +1,8 @@
 /**
  * Seed script para popular o ecossistema distribuído com dados ricos de demonstração.
+ * Todo o tráfego passa pelo API Gateway (as portas dos serviços não são expostas).
  * Cria:
- * 1. Usuário Administrador (admin@microstore.com) com role ADMIN
+ * 1. Login com o ADMIN provisionado pelo user-service no boot (ADMIN_EMAIL/ADMIN_PASSWORD)
  * 2. Usuário Cliente (cliente@microstore.com) com role CUSTOMER
  * 3. 5 Produtos com fotos no catalog-service (MongoDB)
  * 4. Estoque sincronizado para cada produto no inventory-service (PostgreSQL)
@@ -59,130 +60,98 @@ const DEMO_PRODUCTS: ProductSeed[] = [
   },
 ];
 
-async function seed() {
-  const userApiUrl = process.env.USER_API_URL || 'http://localhost:3000';
-  const catalogApiUrl = process.env.CATALOG_API_URL || 'http://localhost:3001';
-  const inventoryApiUrl = process.env.INVENTORY_PORT
-    ? `http://localhost:${process.env.INVENTORY_PORT}`
-    : 'http://localhost:3003';
+const GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://localhost:8080';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@microstore.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'AdminPassword123!';
 
-  console.log('--- Iniciando Seed de Demonstração MicroStore ---');
-
-  // 1. Criar ou logar Admin
-  let adminToken = '';
-  try {
-    const regRes = await fetch(`${userApiUrl}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'Arquiteto Admin',
-        email: 'admin@microstore.com',
-        password: 'AdminPassword123!',
-        role: 'ADMIN',
-      }),
-    });
-    if (!regRes.ok && regRes.status !== 409) {
-      console.warn(`Registro admin status: ${regRes.status}`);
-    }
-  } catch (err) {
-    console.warn('Admin já existente ou erro de conexão:', (err as Error).message);
-  }
-
-  try {
-    const loginRes = await fetch(`${userApiUrl}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'admin@microstore.com',
-        password: 'AdminPassword123!',
-      }),
-    });
-    if (loginRes.ok) {
-      const data = await loginRes.json() as { token: string };
-      adminToken = data.token;
-      console.log('✓ Admin autenticado com sucesso (role: ADMIN)');
-    }
-  } catch (err) {
-    console.error('Falha ao logar admin:', (err as Error).message);
-  }
-
-  // 2. Criar Cliente de Teste
-  try {
-    const custRes = await fetch(`${userApiUrl}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'Cliente Exemplo',
-        email: 'cliente@microstore.com',
-        password: 'ClientePassword123!',
-        role: 'CUSTOMER',
-      }),
-    });
-    if (custRes.ok || custRes.status === 409) {
-      console.log('✓ Cliente de teste pronto: cliente@microstore.com (Senha: ClientePassword123!)');
-    }
-  } catch (err) {
-    console.warn('Erro ao criar cliente demo:', (err as Error).message);
-  }
-
-  // 3. Cadastrar Produtos e Sincronizar Estoque
-  for (const p of DEMO_PRODUCTS) {
-    try {
-      let productId = '';
-      const prodRes = await fetch(`${catalogApiUrl}/api/products`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
-        },
-        body: JSON.stringify({
-          name: p.name,
-          sku: p.sku,
-          price: p.price,
-          stock: p.stock,
-          description: p.description,
-        }),
-      });
-
-      if (prodRes.ok) {
-        const prodData = await prodRes.json() as { id: string };
-        productId = prodData.id;
-        console.log(`✓ Produto cadastrado no Catálogo (MongoDB): [${p.sku}] ${p.name}`);
-      } else if (prodRes.status === 409) {
-        // Buscar ID do produto existente
-        const getRes = await fetch(`${catalogApiUrl}/api/products?q=${encodeURIComponent(p.sku)}`);
-        if (getRes.ok) {
-          const list = await getRes.json() as { items: Array<{ id: string; sku: string }> };
-          const found = list.items.find(i => i.sku === p.sku);
-          if (found) productId = found.id;
-        }
-        console.log(`* Produto já existia no Catálogo: [${p.sku}]`);
-      }
-
-      // Sincronizar no inventory-service (PostgreSQL)
-      if (productId) {
-        const invRes = await fetch(`${inventoryApiUrl}/api/inventory/seed`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
-          },
-          body: JSON.stringify({
-            productId,
-            sku: p.sku,
-            availableQty: p.stock,
-          }),
-        });
-        if (invRes.ok) {
-          console.log(`  └─ Estoque provisionado no inventory-service (PostgreSQL): ${p.stock} unidades para ${p.sku}`);
-        }
-      }
-    } catch (err) {
-      console.warn(`Aviso ao sincronizar produto ${p.sku}:`, (err as Error).message);
-    }
-  }
-
-  console.log('--- Seed de Demonstração Concluído com Sucesso! ---');
+async function api<T>(
+  method: 'GET' | 'POST',
+  path: string,
+  body?: unknown,
+  token?: string
+): Promise<{ status: number; data: T }> {
+  const res = await fetch(`${GATEWAY_URL}${path}`, {
+    method,
+    headers: {
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await res.text();
+  return { status: res.status, data: (text ? JSON.parse(text) : null) as T };
 }
 
-void seed();
+async function seed(): Promise<void> {
+  console.log(`--- Seed de Demonstração MicroStore (via gateway ${GATEWAY_URL}) ---`);
+
+  // 1. Admin: provisionado pelo user-service; aqui só autenticamos
+  const login = await api<{ tokenJwt?: string; user?: { role: string } }>('POST', '/login', {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+  });
+  const adminToken = login.data?.tokenJwt;
+  if (login.status !== 200 || !adminToken || login.data.user?.role !== 'ADMIN') {
+    throw new Error(
+      `Não foi possível autenticar o ADMIN ${ADMIN_EMAIL} (HTTP ${login.status}). ` +
+        'Confira ADMIN_EMAIL/ADMIN_PASSWORD no .env e se a stack está healthy.'
+    );
+  }
+  console.log(`✓ Admin autenticado: ${ADMIN_EMAIL}`);
+
+  // 2. Cliente de teste (cadastro público => sempre CUSTOMER)
+  const customer = await api('POST', '/users', {
+    name: 'Cliente Exemplo',
+    email: 'cliente@microstore.com',
+    password: 'ClientePassword123!',
+  });
+  if (customer.status !== 201 && customer.status !== 400) {
+    throw new Error(`Falha ao criar cliente demo (HTTP ${customer.status})`);
+  }
+  console.log('✓ Cliente pronto: cliente@microstore.com (Senha: ClientePassword123!)');
+
+  // 3. Produtos no catálogo + estoque sincronizado no inventory
+  for (const p of DEMO_PRODUCTS) {
+    let productId: string | undefined;
+
+    const created = await api<{ id: string }>(
+      'POST',
+      '/api/products',
+      { name: p.name, sku: p.sku, price: p.price, stock: p.stock, description: p.description },
+      adminToken
+    );
+    if (created.status === 201 || created.status === 200) {
+      productId = created.data.id;
+      console.log(`✓ Produto cadastrado no catálogo: [${p.sku}] ${p.name}`);
+    } else if (created.status === 409 || created.status === 400) {
+      const found = await api<{ items: Array<{ id: string; sku: string }> }>(
+        'GET',
+        `/api/products?q=${encodeURIComponent(p.sku)}&limit=100`
+      );
+      productId = found.data.items.find((i) => i.sku === p.sku)?.id;
+      console.log(`* Produto já existia no catálogo: [${p.sku}]`);
+    }
+
+    if (!productId) {
+      throw new Error(`Não foi possível obter o produto ${p.sku} (HTTP ${created.status})`);
+    }
+
+    const stock = await api(
+      'POST',
+      '/api/inventory/seed',
+      { productId, sku: p.sku, availableQty: p.stock },
+      adminToken
+    );
+    if (stock.status >= 300) {
+      throw new Error(`Falha ao provisionar estoque de ${p.sku} (HTTP ${stock.status})`);
+    }
+    console.log(`  └─ Estoque: ${p.stock} unidades de ${p.sku}`);
+  }
+
+  console.log('--- Seed concluído ---');
+}
+
+seed().catch((err: Error) => {
+  console.error(`✗ Seed falhou: ${err.message}`);
+  process.exit(1);
+});

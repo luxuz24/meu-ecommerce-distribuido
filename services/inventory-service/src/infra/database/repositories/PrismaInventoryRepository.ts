@@ -1,4 +1,5 @@
 import { type PrismaClient } from '@prisma/client';
+import { currentCorrelationId } from '../../observability/correlation.js';
 import { InventoryItem } from '../../../domain/entities/InventoryItem.js';
 import {
   StockReservation,
@@ -106,6 +107,7 @@ export class PrismaInventoryRepository implements IInventoryRepository {
 
         await tx.outbox.create({
           data: {
+            correlationId: currentCorrelationId(),
             aggregateType: 'Inventory',
             aggregateId: input.orderId,
             eventType: 'STOCK_RESERVED',
@@ -165,6 +167,7 @@ export class PrismaInventoryRepository implements IInventoryRepository {
 
         await tx.outbox.create({
           data: {
+            correlationId: currentCorrelationId(),
             aggregateType: 'Inventory',
             aggregateId: input.orderId,
             eventType: 'STOCK_REJECTED',
@@ -223,6 +226,7 @@ export class PrismaInventoryRepository implements IInventoryRepository {
 
         await tx.outbox.create({
           data: {
+            correlationId: currentCorrelationId(),
             aggregateType: 'Inventory',
             aggregateId: orderId,
             eventType: 'STOCK_RELEASED',

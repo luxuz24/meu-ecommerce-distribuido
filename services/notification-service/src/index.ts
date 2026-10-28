@@ -126,6 +126,7 @@ function startConsumer(): void {
           console.log(` [NEW EVENT TRIGGERED: ${action.type}] `);
           console.log(`Recipient: ${action.recipient}`);
           console.log(`Summary: ${action.summary}`);
+          console.log(`Correlation: cid=${message.properties.correlationId ?? '-'}`);
           console.log('=======================================');
 
           channel.ack(message);

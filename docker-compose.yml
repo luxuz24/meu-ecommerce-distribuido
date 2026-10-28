@@ -65,12 +65,12 @@ services:
       dockerfile: Dockerfile
     container_name: user-service
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       - JWT_SECRET=${JWT_SECRET}
       - PORT=${PORT}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@microstore.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-AdminPassword123!}
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
@@ -130,8 +130,6 @@ services:
       dockerfile: Dockerfile
     container_name: catalog-service
     restart: unless-stopped
-    ports:
-      - "${CATALOG_PORT:-3001}:${CATALOG_PORT:-3001}"
     environment:
       - PORT=${CATALOG_PORT:-3001}
       - MONGO_URI=mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASS}@mongodb:27017/catalog_db?authSource=admin
@@ -154,8 +152,6 @@ services:
       dockerfile: Dockerfile
     container_name: inventory-service
     restart: unless-stopped
-    ports:
-      - "${INVENTORY_PORT:-3003}:${INVENTORY_PORT:-3003}"
     environment:
       - PORT=${INVENTORY_PORT:-3003}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/inventory_db?schema=public
@@ -181,8 +177,6 @@ services:
       dockerfile: Dockerfile
     container_name: order-service
     restart: unless-stopped
-    ports:
-      - "${ORDER_PORT:-3004}:${ORDER_PORT:-3004}"
     environment:
       - PORT=${ORDER_PORT:-3004}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/order_db?schema=public
@@ -211,8 +205,6 @@ services:
       dockerfile: Dockerfile
     container_name: payment-service
     restart: unless-stopped
-    ports:
-      - "${PAYMENT_PORT:-3005}:${PAYMENT_PORT:-3005}"
     environment:
       - PORT=${PAYMENT_PORT:-3005}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db?schema=public
@@ -254,17 +246,16 @@ services:
       payment-service:
         condition: service_healthy
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
     container_name: microstore-frontend
     restart: unless-stopped
     ports:
       - "3002:3002"
-    environment:
-      - VITE_USER_API_URL=http://localhost:3000
-      - VITE_CATALOG_API_URL=http://localhost:3001
-      - VITE_DEV_TELEMETRY=true
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_GATEWAY_URL=http://localhost:8080
+        - VITE_DEV_TELEMETRY=true
     networks:
       - ecom_network
     depends_on:

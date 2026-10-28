@@ -13,16 +13,15 @@ import type {
   User,
 } from '../domain/types';
 
-export const USER_API_URL =
-  import.meta.env.VITE_USER_API_URL || 'http://localhost:3000';
-export const CATALOG_API_URL =
-  import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3001';
-export const INVENTORY_API_URL =
-  import.meta.env.VITE_INVENTORY_API_URL || 'http://localhost:3003';
-export const ORDER_API_URL =
-  import.meta.env.VITE_ORDER_API_URL || 'http://localhost:3004';
-export const PAYMENT_API_URL =
-  import.meta.env.VITE_PAYMENT_API_URL || 'http://localhost:3005';
+// Todo o tráfego do browser passa pelo API Gateway (Nginx): rate limit, roteamento
+// e X-Correlation-ID ficam num único ponto de entrada.
+export const API_GATEWAY_URL =
+  import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080';
+export const USER_API_URL = API_GATEWAY_URL;
+export const CATALOG_API_URL = API_GATEWAY_URL;
+export const INVENTORY_API_URL = API_GATEWAY_URL;
+export const ORDER_API_URL = API_GATEWAY_URL;
+export const PAYMENT_API_URL = API_GATEWAY_URL;
 
 export class ApiError extends Error {
   public readonly statusCode: number;
@@ -93,6 +92,9 @@ async function requestWithTelemetry<T>(
     service,
     statusCode: response.status,
     latencyMs,
+    ...(response.headers.get('x-correlation-id')
+      ? { correlationId: response.headers.get('x-correlation-id') as string }
+      : {}),
     responseBody,
     timestamp: new Date().toISOString(),
   };
@@ -118,14 +120,13 @@ export const userApi = {
       'user-service:3000',
       USER_API_URL,
       'GET',
-      '/health'
+      '/health/user'
     ),
 
   register: (payload: {
     name: string;
     email: string;
     password: string;
-    role?: 'CUSTOMER' | 'ADMIN';
   }) =>
     requestWithTelemetry<User>('user-service:3000', USER_API_URL, 'POST', '/users', {
       body: payload,
@@ -152,7 +153,7 @@ export const catalogApi = {
       'catalog-service:3001',
       CATALOG_API_URL,
       'GET',
-      '/health'
+      '/health/catalog'
     ),
 
   listProducts: (params: {
@@ -244,7 +245,7 @@ export const inventoryApi = {
       'inventory-service:3003',
       INVENTORY_API_URL,
       'GET',
-      '/health'
+      '/health/inventory'
     ),
 
   getBySku: (sku: string) =>
@@ -293,7 +294,7 @@ export const orderApi = {
       'order-service:3004',
       ORDER_API_URL,
       'GET',
-      '/health'
+      '/health/order'
     ),
 
   createOrder: (
@@ -385,7 +386,7 @@ export const paymentApi = {
       'payment-service:3005',
       PAYMENT_API_URL,
       'GET',
-      '/health'
+      '/health/payment'
     ),
 
   getByOrderId: (orderId: string) =>
