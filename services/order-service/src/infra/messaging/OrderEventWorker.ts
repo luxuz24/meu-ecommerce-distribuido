@@ -1,15 +1,16 @@
-import amqp from 'amqplib';
+import { type ConfirmChannel } from 'amqplib';
 import { type PrismaClient } from '@prisma/client';
 import {
   type OrderSagaEventType,
   type UpdateOrderStatusUseCase,
 } from '../../use-cases/UpdateOrderStatusUseCase.js';
+import { ResilientRabbitConnection, startOutboxRelay } from './ResilientRabbit.js';
 
 const EXCHANGE_NAME = 'ecommerce_events';
 const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
 const ORDER_SAGA_QUEUE = 'order_saga_events';
 const ORDER_SAGA_DLQ = 'order_saga_events_dlq';
-const OUTBOX_POLL_MS = 3000;
+const SERVICE_NAME = 'order-service';
 
 const ROUTING_KEY_TO_EVENT: Record<string, OrderSagaEventType> = {
   stock_reserved: 'STOCK_RESERVED',
@@ -18,21 +19,17 @@ const ROUTING_KEY_TO_EVENT: Record<string, OrderSagaEventType> = {
   payment_failed: 'PAYMENT_FAILED',
 };
 
-export async function startOrderMessaging(
+export function startOrderMessaging(
   prisma: PrismaClient,
   updateOrderStatusUseCase: UpdateOrderStatusUseCase
-): Promise<void> {
+): ResilientRabbitConnection | null {
   const rabbitUrl = process.env.RABBITMQ_URL;
   if (!rabbitUrl) {
-    console.warn('[order-service] RABBITMQ_URL not set; skipping RabbitMQ consumer/outbox worker');
-    return;
+    console.warn(`[${SERVICE_NAME}] RABBITMQ_URL not set; skipping RabbitMQ consumer/outbox worker`);
+    return null;
   }
 
-  try {
-    const conn = await amqp.connect(rabbitUrl);
-    const channel = await conn.createChannel();
-    // Backpressure: no máximo N mensagens não confirmadas em processamento simultâneo
-    await channel.prefetch(10);
+  const setupTopology = async (channel: ConfirmChannel): Promise<void> => {
     await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
     await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
 
@@ -79,45 +76,14 @@ export async function startOrderMessaging(
 
         channel.ack(msg);
       } catch (err) {
-        console.error('[order-service] Error processing Saga event:', err);
+        console.error(`[${SERVICE_NAME}] Error processing Saga event:`, err);
         channel.nack(msg, false, false);
       }
     });
+  };
 
-    setInterval(async () => {
-      try {
-        const pending = await prisma.outbox.findMany({
-          where: { published: false },
-          orderBy: { createdAt: 'asc' },
-          take: 20,
-        });
-
-        for (const event of pending) {
-          const routingKey = event.eventType.toLowerCase();
-          const published = channel.publish(
-            EXCHANGE_NAME,
-            routingKey,
-            Buffer.from(JSON.stringify(event.payload)),
-            {
-              persistent: true,
-              messageId: event.id,
-            }
-          );
-
-          if (published) {
-            await prisma.outbox.update({
-              where: { id: event.id },
-              data: { published: true },
-            });
-          }
-        }
-      } catch (err) {
-        console.error('[order-service] Outbox relay error:', err);
-      }
-    }, OUTBOX_POLL_MS);
-
-    console.log('[order-service] Connected to RabbitMQ (Saga consumer + Outbox relay)');
-  } catch (err) {
-    console.warn('[order-service] Could not connect to RabbitMQ at startup:', err);
-  }
+  const rabbit = new ResilientRabbitConnection(rabbitUrl, SERVICE_NAME, setupTopology);
+  rabbit.start();
+  startOutboxRelay(prisma, rabbit, EXCHANGE_NAME, SERVICE_NAME);
+  return rabbit;
 }

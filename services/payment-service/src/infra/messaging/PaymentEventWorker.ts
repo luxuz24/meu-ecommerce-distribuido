@@ -1,28 +1,25 @@
-import amqp from 'amqplib';
+import { type ConfirmChannel } from 'amqplib';
 import { type PrismaClient } from '@prisma/client';
 import { type ProcessPaymentUseCase } from '../../use-cases/PaymentUseCases.js';
+import { ResilientRabbitConnection, startOutboxRelay } from './ResilientRabbit.js';
 
 const EXCHANGE_NAME = 'ecommerce_events';
 const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
 const STOCK_RESERVED_QUEUE = 'payment_stock_reserved';
 const STOCK_RESERVED_DLQ = 'payment_stock_reserved_dlq';
-const OUTBOX_POLL_MS = 3000;
+const SERVICE_NAME = 'payment-service';
 
-export async function startPaymentMessaging(
+export function startPaymentMessaging(
   prisma: PrismaClient,
   processPaymentUseCase: ProcessPaymentUseCase
-): Promise<void> {
+): ResilientRabbitConnection | null {
   const rabbitUrl = process.env.RABBITMQ_URL;
   if (!rabbitUrl) {
-    console.warn('[payment-service] RABBITMQ_URL not set; skipping RabbitMQ consumer/outbox worker');
-    return;
+    console.warn(`[${SERVICE_NAME}] RABBITMQ_URL not set; skipping RabbitMQ consumer/outbox worker`);
+    return null;
   }
 
-  try {
-    const conn = await amqp.connect(rabbitUrl);
-    const channel = await conn.createChannel();
-    // Backpressure: no máximo N mensagens não confirmadas em processamento simultâneo
-    await channel.prefetch(10);
+  const setupTopology = async (channel: ConfirmChannel): Promise<void> => {
     await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
     await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
 
@@ -78,45 +75,14 @@ export async function startPaymentMessaging(
 
         channel.ack(msg);
       } catch (err) {
-        console.error('[payment-service] Error processing stock_reserved event:', err);
+        console.error(`[${SERVICE_NAME}] Error processing stock_reserved event:`, err);
         channel.nack(msg, false, false);
       }
     });
+  };
 
-    setInterval(async () => {
-      try {
-        const pending = await prisma.outbox.findMany({
-          where: { published: false },
-          orderBy: { createdAt: 'asc' },
-          take: 20,
-        });
-
-        for (const event of pending) {
-          const routingKey = event.eventType.toLowerCase();
-          const published = channel.publish(
-            EXCHANGE_NAME,
-            routingKey,
-            Buffer.from(JSON.stringify(event.payload)),
-            {
-              persistent: true,
-              messageId: event.id,
-            }
-          );
-
-          if (published) {
-            await prisma.outbox.update({
-              where: { id: event.id },
-              data: { published: true },
-            });
-          }
-        }
-      } catch (err) {
-        console.error('[payment-service] Outbox relay error:', err);
-      }
-    }, OUTBOX_POLL_MS);
-
-    console.log('[payment-service] Connected to RabbitMQ (stock_reserved consumer + outbox relay)');
-  } catch (err) {
-    console.warn('[payment-service] Could not connect to RabbitMQ at startup:', err);
-  }
+  const rabbit = new ResilientRabbitConnection(rabbitUrl, SERVICE_NAME, setupTopology);
+  rabbit.start();
+  startOutboxRelay(prisma, rabbit, EXCHANGE_NAME, SERVICE_NAME);
+  return rabbit;
 }

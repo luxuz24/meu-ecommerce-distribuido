@@ -19,6 +19,9 @@ const app = Fastify({
 
 const start = async () => {
   try {
+    // Conecta em background com retry: o HTTP sobe mesmo com o broker ainda indisponível
+    const rabbit = startInventoryMessaging(prisma, reserveStockUseCase, releaseStockUseCase);
+
     await app.register(helmet);
 
     const rawOrigins =
@@ -63,12 +66,17 @@ const start = async () => {
     });
 
     app.get('/health', async (_request, reply) => {
+      const messaging = rabbit?.isConnected ? 'connected' : 'disconnected';
+      let database = 'connected';
       try {
         await prisma.$queryRaw`SELECT 1`;
-        return { status: 'up', service: 'inventory-service', database: 'connected' };
       } catch {
-        return reply.status(503).send({ status: 'degraded', service: 'inventory-service', database: 'disconnected' });
+        database = 'disconnected';
       }
+      const healthy = database === 'connected' && messaging === 'connected';
+      return reply
+        .status(healthy ? 200 : 503)
+        .send({ status: healthy ? 'up' : 'degraded', service: 'inventory-service', database, messaging });
     });
 
     await app.register(
@@ -82,7 +90,6 @@ const start = async () => {
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`Inventory service running on port ${port}`);
 
-    await startInventoryMessaging(prisma, reserveStockUseCase, releaseStockUseCase);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

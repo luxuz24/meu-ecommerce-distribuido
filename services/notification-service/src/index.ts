@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import amqp from 'amqplib';
+import { type ConfirmChannel } from 'amqplib';
+import { ResilientRabbitConnection } from './ResilientRabbit.js';
 
 export interface NotificationAction {
   type: 'WELCOME_EMAIL' | 'ORDER_CONFIRMED_EMAIL' | 'PAYMENT_FAILED_ALERT' | 'ORDER_CANCELLED_ALERT';
@@ -79,17 +80,15 @@ export function buildNotificationQueueArguments(): Record<string, string> {
   };
 }
 
-async function startConsumer() {
-  try {
-    const rabbitmqUrl = process.env.RABBITMQ_URL;
-    if (!rabbitmqUrl) {
-      throw new Error('CRITICAL: RABBITMQ_URL is missing in .env');
-    }
+export const READINESS_FILE = '/tmp/notification-service.ready';
 
-    console.log('Connecting to RabbitMQ...');
-    const connection = await amqp.connect(rabbitmqUrl);
-    const channel = await connection.createChannel();
+function startConsumer(): void {
+  const rabbitmqUrl = process.env.RABBITMQ_URL;
+  if (!rabbitmqUrl) {
+    throw new Error('CRITICAL: RABBITMQ_URL is missing in .env');
+  }
 
+  const setupTopology = async (channel: ConfirmChannel): Promise<void> => {
     await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
     await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
     await channel.assertQueue(DLQ_QUEUE_NAME, { durable: true });
@@ -136,11 +135,17 @@ async function startConsumer() {
         }
       }
     });
-  } catch (error) {
-    console.error('Failed to start Notification Service:', error);
-  }
+  };
+
+  new ResilientRabbitConnection(
+    rabbitmqUrl,
+    'notification-service',
+    setupTopology,
+    10,
+    READINESS_FILE
+  ).start();
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  void startConsumer();
+  startConsumer();
 }

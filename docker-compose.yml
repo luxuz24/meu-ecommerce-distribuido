@@ -33,7 +33,12 @@ services:
       - "27017:27017"
     networks:
       - ecom_network
-
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: ecom_rabbitmq
@@ -48,7 +53,12 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - ecom_network
-
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
   user-service:
     build:
       context: ./services/user-service
@@ -67,6 +77,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
   user-outbox-processor:
     build:
       context: ./services/user-outbox-processor
@@ -78,11 +94,17 @@ services:
       - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/user-outbox-processor.ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started   
+        condition: service_healthy
   notification-service:
     build:
       context: ./services/notification-service
@@ -93,10 +115,15 @@ services:
       - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/notification-service.ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       rabbitmq:
-        condition: service_started   
-
+        condition: service_healthy
   catalog-service:
     build:
       context: ./services/catalog-service
@@ -112,9 +139,15 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${CATALOG_PORT:-3001}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
-      - mongodb   
-
+      mongodb:
+        condition: service_healthy
   inventory-service:
     build:
       context: ./services/inventory-service
@@ -131,12 +164,17 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${INVENTORY_PORT:-3003}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-
+        condition: service_healthy
   order-service:
     build:
       context: ./services/order-service
@@ -154,12 +192,19 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${ORDER_PORT:-3004}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
   payment-service:
     build:
       context: ./services/payment-service
@@ -176,12 +221,17 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${PAYMENT_PORT:-3005}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-
+        condition: service_healthy
   api-gateway:
     image: nginx:1.27-alpine
     container_name: ecom_api_gateway
@@ -193,12 +243,16 @@ services:
     networks:
       - ecom_network
     depends_on:
-      - user-service
-      - catalog-service
-      - inventory-service
-      - order-service
-      - payment-service
-
+      user-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
   frontend:
     build:
       context: ./frontend
@@ -214,9 +268,8 @@ services:
     networks:
       - ecom_network
     depends_on:
-      - user-service
-      - catalog-service
-
+      api-gateway:
+        condition: service_started
 networks:
   ecom_network:
     driver: bridge
