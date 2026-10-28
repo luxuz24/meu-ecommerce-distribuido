@@ -61,6 +61,24 @@ export function parseNotificationEvent(
   return null;
 }
 
+export const EXCHANGE_NAME = 'ecommerce_events';
+export const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
+export const QUEUE_NAME = 'notification_events_queue';
+export const DLQ_QUEUE_NAME = 'notification_events_dlq';
+export const ROUTING_KEYS = [
+  'user_created',
+  'order_confirmed',
+  'payment_failed',
+  'order_cancelled',
+] as const;
+
+export function buildNotificationQueueArguments(): Record<string, string> {
+  return {
+    'x-dead-letter-exchange': DLX_EXCHANGE_NAME,
+    'x-dead-letter-routing-key': DLQ_QUEUE_NAME,
+  };
+}
+
 async function startConsumer() {
   try {
     const rabbitmqUrl = process.env.RABBITMQ_URL;
@@ -72,26 +90,24 @@ async function startConsumer() {
     const connection = await amqp.connect(rabbitmqUrl);
     const channel = await connection.createChannel();
 
-    const exchangeName = 'ecommerce_events';
-    const queueName = 'notification_events_queue';
-    const routingKeys = [
-      'user_created',
-      'order_confirmed',
-      'payment_failed',
-      'order_cancelled',
-    ];
+    await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
+    await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
+    await channel.assertQueue(DLQ_QUEUE_NAME, { durable: true });
+    await channel.bindQueue(DLQ_QUEUE_NAME, DLX_EXCHANGE_NAME, DLQ_QUEUE_NAME);
 
-    await channel.assertExchange(exchangeName, 'topic', { durable: true });
-    await channel.assertQueue(queueName, { durable: true });
-    for (const key of routingKeys) {
-      await channel.bindQueue(queueName, exchangeName, key);
+    await channel.assertQueue(QUEUE_NAME, {
+      durable: true,
+      arguments: buildNotificationQueueArguments(),
+    });
+    for (const key of ROUTING_KEYS) {
+      await channel.bindQueue(QUEUE_NAME, EXCHANGE_NAME, key);
     }
 
     console.log(
-      `Listening! Bound Queue "${queueName}" to Exchange "${exchangeName}" for [${routingKeys.join(', ')}]`
+      `Listening! Bound Queue "${QUEUE_NAME}" to Exchange "${EXCHANGE_NAME}" for [${ROUTING_KEYS.join(', ')}] (DLQ: "${DLQ_QUEUE_NAME}")`
     );
 
-    await channel.consume(queueName, (message) => {
+    await channel.consume(QUEUE_NAME, (message) => {
       if (message !== null) {
         try {
           const routingKey = message.fields.routingKey || 'user_created';
@@ -99,8 +115,11 @@ async function startConsumer() {
           const action = parseNotificationEvent(routingKey, rawMessage);
 
           if (!action) {
-            console.error('ERROR: Invalid notification event payload:', rawMessage);
-            channel.ack(message);
+            console.error(
+              'ERROR: Invalid notification event payload (routing to DLQ):',
+              rawMessage
+            );
+            channel.nack(message, false, false);
             return;
           }
 
@@ -112,8 +131,8 @@ async function startConsumer() {
 
           channel.ack(message);
         } catch (err) {
-          console.error('Erro ao processar a mensagem:', err);
-          channel.ack(message);
+          console.error('Erro ao processar a mensagem (routing to DLQ):', err);
+          channel.nack(message, false, false);
         }
       }
     });

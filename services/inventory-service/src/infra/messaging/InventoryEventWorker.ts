@@ -4,8 +4,11 @@ import { type ReserveStockUseCase } from '../../use-cases/ReserveStockUseCase.js
 import { type ReleaseStockUseCase } from '../../use-cases/ReleaseStockUseCase.js';
 
 const EXCHANGE_NAME = 'ecommerce_events';
+const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
 const ORDER_CREATED_QUEUE = 'inventory_order_created';
+const ORDER_CREATED_DLQ = 'inventory_order_created_dlq';
 const PAYMENT_FAILED_QUEUE = 'inventory_payment_failed';
+const PAYMENT_FAILED_DLQ = 'inventory_payment_failed_dlq';
 const OUTBOX_POLL_MS = 3000;
 
 export async function startInventoryMessaging(
@@ -23,9 +26,21 @@ export async function startInventoryMessaging(
     const conn = await amqp.connect(rabbitUrl);
     const channel = await conn.createChannel();
     await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
+    await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
+
+    await channel.assertQueue(ORDER_CREATED_DLQ, { durable: true });
+    await channel.bindQueue(ORDER_CREATED_DLQ, DLX_EXCHANGE_NAME, ORDER_CREATED_DLQ);
+    await channel.assertQueue(PAYMENT_FAILED_DLQ, { durable: true });
+    await channel.bindQueue(PAYMENT_FAILED_DLQ, DLX_EXCHANGE_NAME, PAYMENT_FAILED_DLQ);
 
     // 1. Consumer: order_created
-    await channel.assertQueue(ORDER_CREATED_QUEUE, { durable: true });
+    await channel.assertQueue(ORDER_CREATED_QUEUE, {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': DLX_EXCHANGE_NAME,
+        'x-dead-letter-routing-key': ORDER_CREATED_DLQ,
+      },
+    });
     await channel.bindQueue(ORDER_CREATED_QUEUE, EXCHANGE_NAME, 'order_created');
 
     await channel.consume(ORDER_CREATED_QUEUE, async (msg) => {
@@ -54,7 +69,13 @@ export async function startInventoryMessaging(
     });
 
     // 2. Consumer: payment_failed (compensation)
-    await channel.assertQueue(PAYMENT_FAILED_QUEUE, { durable: true });
+    await channel.assertQueue(PAYMENT_FAILED_QUEUE, {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': DLX_EXCHANGE_NAME,
+        'x-dead-letter-routing-key': PAYMENT_FAILED_DLQ,
+      },
+    });
     await channel.bindQueue(PAYMENT_FAILED_QUEUE, EXCHANGE_NAME, 'payment_failed');
 
     await channel.consume(PAYMENT_FAILED_QUEUE, async (msg) => {

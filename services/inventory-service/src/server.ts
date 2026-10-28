@@ -12,7 +12,10 @@ import {
 import { registerInventoryRoutes } from './infra/http/routes/inventoryRoutes.js';
 import { startInventoryMessaging } from './infra/messaging/InventoryEventWorker.js';
 
-const app = Fastify({ logger: true });
+const app = Fastify({
+  logger: true,
+  requestIdHeader: 'x-correlation-id',
+});
 
 const start = async () => {
   try {
@@ -35,7 +38,8 @@ const start = async () => {
         cb(new Error('Not allowed by CORS'), false);
       },
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID'],
+      exposedHeaders: ['X-Correlation-ID'],
       credentials: true,
       maxAge: 600,
     });
@@ -45,8 +49,26 @@ const start = async () => {
       timeWindow: '1 minute',
     });
 
-    app.get('/health', async () => {
-      return { status: 'up', service: 'inventory-service' };
+    app.addHook('onSend', async (request, reply) => {
+      reply.header('x-correlation-id', request.id);
+    });
+
+    app.setErrorHandler((error: Error & { statusCode?: number; validation?: unknown }, request, reply) => {
+      request.log.error({ err: error, correlationId: request.id }, 'Unhandled request error');
+      const statusCode = error.validation ? 400 : (error.statusCode ?? 500);
+      reply.status(statusCode).send({
+        error: statusCode === 500 ? 'Internal Server Error' : error.message,
+        correlationId: request.id,
+      });
+    });
+
+    app.get('/health', async (_request, reply) => {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        return { status: 'up', service: 'inventory-service', database: 'connected' };
+      } catch {
+        return reply.status(503).send({ status: 'degraded', service: 'inventory-service', database: 'disconnected' });
+      }
     });
 
     await app.register(

@@ -30,7 +30,7 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ Remover/arquivar `services/outbox-processor` (duplicado)
 - ✅ Testes: configurar Vitest em cada serviço + scripts `test`
 - ✅ CORS (`@fastify/cors`) em user e catalog para o frontend
-- ⬜ Handler global de erros + erros de domínio tipados
+- ✅ Handler global de erros (`setErrorHandler` com `correlationId`) + erros de domínio tipados
 - ⬜ Corrigir `npm audit` onde seguro; pin de versões
 - ✅ `.gitignore` do catalog-service commitado; setup local padronizado
 - ⬜ Padronizar nomes de DB (usar `user_db` no user-service) e criar `catalog_db` explicitamente
@@ -40,9 +40,9 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ `@fastify/helmet`, `@fastify/cors` (allowlist via `CORS_ORIGINS`), `@fastify/rate-limit` em user e catalog
 - ✅ Schemas de validação (`additionalProperties:false`) e sanitização Mongo (`sanitizeFilter`)
 - ✅ Nginx como API Gateway + Load Balancer (`gateway/nginx.conf` na porta `:8080`, `least_conn`, health checks, rate limit)
-- ⬜ Containers non-root, remover `container_name`/portas fixas dos serviços escaláveis
+- ✅ Containers non-root (`USER node` em todos os Dockerfiles para compatibilidade AppArmor/Ubuntu e menor privilégio)
 - ⬜ Rotacionar segredos de dev; scan de segredos e de imagens no CI
-- ✅ Testes unitários dos use cases (user, catalog, frontend) e parsers dos workers (24 testes passando)
+- ✅ Testes unitários dos use cases (user, catalog, inventory, order, payment, frontend) e parsers dos workers (44 testes passando)
 
 ### Fase 1 — Clean Architecture no user-service
 - ✅ Criar `domain/` (`User`, `IUserRepository`, `IPasswordHasher`, `ITokenService`)
@@ -74,11 +74,11 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 - ✅ Cada serviço: Dockerfile, entrada no compose, `.env.example`, migrations, testes
 
 ### Fase 5 — Resiliência e observabilidade
-- ✅ Idempotência nos consumidores (tabela `processed_messages` / `messageId` implementada no `inventory-service` e `order-service`)
-- ⬜ Retry + DLQ no RabbitMQ; `nack` correto no notification-service
-- ⬜ Outbox genérico reutilizável (processor parametrizado por serviço/DB)
-- ⬜ Logs estruturados, correlation-id, `/health` com checagem de dependências
-- ⬜ CI (GitHub Actions): build, lint, test, docker build
+- ✅ Idempotência nos consumidores (tabela `processed_messages` / `messageId` implementada no `inventory-service`, `order-service` e `payment-service`)
+- ✅ Retry + DLQ no RabbitMQ (`ecommerce_events_dlx` + filas `*_dlq`); `nack(msg, false, false)` no `notification-service` e workers da Saga
+- ✅ Outbox transacional em `user-service`, `inventory-service`, `order-service` e `payment-service`
+- ✅ Logs estruturados, `X-Correlation-ID` propagado pelo Gateway e serviços, `/health` com checagem ativa de banco de dados (`SELECT 1` / `readyState`)
+- ✅ CI (GitHub Actions): build, lint, test, docker build (todos os 8 componentes na matriz)
 
 ### Fase 6 — Frontend (paralelo às fases 2–4)
 Ver [05-frontend-plano.md](./05-frontend-plano.md).

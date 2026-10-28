@@ -6,7 +6,9 @@ import {
 } from '../../use-cases/UpdateOrderStatusUseCase.js';
 
 const EXCHANGE_NAME = 'ecommerce_events';
+const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
 const ORDER_SAGA_QUEUE = 'order_saga_events';
+const ORDER_SAGA_DLQ = 'order_saga_events_dlq';
 const OUTBOX_POLL_MS = 3000;
 
 const ROUTING_KEY_TO_EVENT: Record<string, OrderSagaEventType> = {
@@ -30,8 +32,18 @@ export async function startOrderMessaging(
     const conn = await amqp.connect(rabbitUrl);
     const channel = await conn.createChannel();
     await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
+    await channel.assertExchange(DLX_EXCHANGE_NAME, 'direct', { durable: true });
 
-    await channel.assertQueue(ORDER_SAGA_QUEUE, { durable: true });
+    await channel.assertQueue(ORDER_SAGA_DLQ, { durable: true });
+    await channel.bindQueue(ORDER_SAGA_DLQ, DLX_EXCHANGE_NAME, ORDER_SAGA_DLQ);
+
+    await channel.assertQueue(ORDER_SAGA_QUEUE, {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': DLX_EXCHANGE_NAME,
+        'x-dead-letter-routing-key': ORDER_SAGA_DLQ,
+      },
+    });
     for (const key of Object.keys(ROUTING_KEY_TO_EVENT)) {
       await channel.bindQueue(ORDER_SAGA_QUEUE, EXCHANGE_NAME, key);
     }
