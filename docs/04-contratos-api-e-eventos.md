@@ -26,17 +26,27 @@ JWT: HS256, payload `{userId,email,role}`, expira em 1h, segredo `JWT_SECRET`. H
 
 Produto: `{id, name, description, sku, price, stock, isActive, createdAt, updatedAt}`.
 
-## order / payment / inventory 🕓
-Contratos serão definidos aqui antes da implementação (Fase 4). Rotas previstas: `POST /api/orders`, `GET /api/orders`, `GET /api/orders/:id`, `GET /api/payments/:orderId`.
+## inventory-service — `http://localhost:3003` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`)
+| Método | Rota | Auth | Status | Descrição |
+|---|---|---|---|---|
+| GET | `/health` | — | ✅ | `{status:"up",service:"inventory-service"}` (sem prefixo `/api`) |
+| GET | `/api/inventory` | — | ✅ | Lista itens de estoque (`{items: [...]}`) |
+| GET | `/api/inventory/:sku` | — | ✅ | Consulta estoque por SKU → 200 `{id,productId,sku,availableQty,reservedQty,updatedAt}`; 404 |
+| POST | `/api/inventory/seed` | Bearer JWT (`ADMIN`) | ✅ | Upsert de estoque `{productId,sku,availableQty≥0}` → 200 |
+| POST | `/api/inventory/reserve` | — | ✅ | Reserva atômica `{orderId,messageId?,items:[{sku,quantity}]}` + gravação na `outbox` → 200 `STOCK_RESERVED` ou 409 `STOCK_REJECTED` |
+| POST | `/api/inventory/release/:orderId` | — | ✅ | Compensação: libera estoque reservado de `orderId` + grava `STOCK_RELEASED` na `outbox` |
+
+## order / payment 🕓
+Contratos serão definidos aqui antes da implementação (Fase 4.2 e 4.3). Rotas previstas: `POST /api/orders`, `GET /api/orders`, `GET /api/orders/:id`, `GET /api/payments/:orderId`.
 
 ## Eventos (RabbitMQ — exchange `ecommerce_events`, topic)
 | Evento | Routing key | Produtor | Consumidores | Status | Payload |
 |---|---|---|---|---|---|
 | USER_CREATED | `user_created` | user-service (outbox) | notification-service | ✅ | `{id,name,email}` |
 | PRODUCT_CREATED / UPDATED | `product_created` / `product_updated` | catalog | inventory | 🕓 | `{id,sku,price,stock}` |
-| ORDER_CREATED | `order_created` | order | inventory | 🕓 | `{orderId,userId,items:[{productId,qty,price}],total}` |
-| STOCK_RESERVED / STOCK_REJECTED | `stock_reserved` / `stock_rejected` | inventory | order, payment | 🕓 | `{orderId,reason?}` |
-| PAYMENT_APPROVED / PAYMENT_FAILED | `payment_approved` / `payment_failed` | payment | order, notification, inventory | 🕓 | `{orderId,paymentId}` |
+| ORDER_CREATED | `order_created` | order | inventory | ✅ (consumidor pronto) | `{orderId,userId,items:[{sku,quantity,price}],total}` |
+| STOCK_RESERVED / STOCK_REJECTED | `stock_reserved` / `stock_rejected` | inventory (outbox) | order, payment | ✅ (produtor pronto) | `{orderId,reservationId?,reason?,items}` |
+| PAYMENT_APPROVED / PAYMENT_FAILED | `payment_approved` / `payment_failed` | payment | order, notification, inventory | 🟡 (inventory compensa `payment_failed`) | `{orderId,paymentId}` |
 | ORDER_CONFIRMED / ORDER_CANCELLED | `order_confirmed` / `order_cancelled` | order | notification, inventory | 🕓 | `{orderId,userId}` |
 
 Tabela outbox (Postgres): `id, aggregateType, aggregateId, eventType, payload(JSONB), published, createdAt`.

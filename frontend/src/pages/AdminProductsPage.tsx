@@ -6,7 +6,7 @@ import {
 } from '../components/telemetry/DevTelemetry';
 import { useAuth } from '../context/AuthContext';
 import type { ApiTelemetryRecord, Product } from '../domain/types';
-import { ApiError, catalogApi, userApi } from '../services/api';
+import { ApiError, catalogApi, inventoryApi, userApi } from '../services/api';
 import { formatBRL } from './CatalogPage';
 
 export const AdminProductsPage: React.FC = () => {
@@ -109,6 +109,15 @@ export const AdminProductsPage: React.FC = () => {
           stock: Number(formStock),
           description: formDesc.trim(),
         });
+        try {
+          await inventoryApi.seedStock({
+            productId: res.data.id,
+            sku: res.data.sku,
+            availableQty: Number(formStock),
+          });
+        } catch {
+          // Optional sync with inventory-service when running locally
+        }
         setTelemetry(res.telemetry);
         setFormSuccess(`Produto "${res.data.name}" criado com sucesso (201)!`);
         setIsCreating(false);
@@ -120,6 +129,15 @@ export const AdminProductsPage: React.FC = () => {
           description: formDesc.trim(),
           isActive: formActive,
         });
+        try {
+          await inventoryApi.seedStock({
+            productId: res.data.id,
+            sku: res.data.sku,
+            availableQty: Number(formStock),
+          });
+        } catch {
+          // Optional sync with inventory-service when running locally
+        }
         setTelemetry(res.telemetry);
         setEditingProduct(res.data);
         setFormSuccess(

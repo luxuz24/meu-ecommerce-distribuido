@@ -48,6 +48,21 @@ export interface UpdateProductInput {
   isActive?: boolean;
 }
 
+export interface InventoryItemRecord {
+  id: string;
+  productId: string;
+  sku: string;
+  availableQty: number;
+  reservedQty: number;
+  updatedAt: string;
+}
+
+export interface ReserveStockResponse {
+  status: 'STOCK_RESERVED' | 'STOCK_REJECTED' | 'ALREADY_PROCESSED';
+  orderId: string;
+  reason?: string;
+}
+
 export interface ApiTelemetryRecord {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   endpoint: string;

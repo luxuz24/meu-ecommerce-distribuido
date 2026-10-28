@@ -1,14 +1,14 @@
 {
   ".github/workflows/ci.yml": {
-    "mtime": 1793189347.8021655,
-    "seen": 1793192426.043612,
-    "ast_hash": "e7c9e52f9ea903e496ec98e2f05c5374",
+    "mtime": 1793193382.2617958,
+    "seen": 1793193737.2331676,
+    "ast_hash": "cd00f3db359781692527d48708399d46",
     "semantic_hash": ""
   },
   "docker-compose.yml": {
-    "mtime": 1793191451.2860973,
-    "seen": 1793192426.04362,
-    "ast_hash": "efa259cf63e40b329e07d9520652813f",
+    "mtime": 1793193373.333836,
+    "seen": 1793193737.2331755,
+    "ast_hash": "77ecb77af972483c7c4173b30fd9e062",
     "semantic_hash": ""
   },
   "frontend/package.json": {
@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "frontend/src/domain/types.ts": {
-    "mtime": 1793191451.287032,
-    "seen": 1793192426.0436375,
-    "ast_hash": "17a48ebd68697410c2c33927db438fff",
+    "mtime": 1793193275.4874191,
+    "seen": 1793193737.2331965,
+    "ast_hash": "c6b0075e493df17dfedfa1171360ceb2",
     "semantic_hash": ""
   },
   "frontend/src/main.tsx": {
@@ -72,9 +72,9 @@
     "semantic_hash": ""
   },
   "frontend/src/pages/AdminProductsPage.tsx": {
-    "mtime": 1793191451.287032,
-    "seen": 1793192426.0436406,
-    "ast_hash": "4e0cb99d73a4048354ac039e1c0cf70f",
+    "mtime": 1793193303.746223,
+    "seen": 1793193737.2332,
+    "ast_hash": "420a8ae9c99b4d282b1bd3a8ba625d2e",
     "semantic_hash": ""
   },
   "frontend/src/pages/AuthPage.tsx": {
@@ -102,9 +102,9 @@
     "semantic_hash": ""
   },
   "frontend/src/services/api.ts": {
-    "mtime": 1793191451.2870972,
-    "seen": 1793192426.0436478,
-    "ast_hash": "c846ba672d986db7009642fbdb4f7e12",
+    "mtime": 1793193279.0433931,
+    "seen": 1793193737.2332077,
+    "ast_hash": "9c437ece1f57eab17b22793060b52b56",
     "semantic_hash": ""
   },
   "frontend/src/vite-env.d.ts": {
@@ -138,9 +138,9 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1793192579.0493135,
-    "seen": 1793192645.5886862,
-    "ast_hash": "befd7496e38a8741efa5e7a0e07bd9ed",
+    "mtime": 1793193376.5778213,
+    "seen": 1793193737.233218,
+    "ast_hash": "ba9272c3a035d4f9d2296d4ab0beb4fb",
     "semantic_hash": ""
   },
   "services/catalog-service/package.json": {
@@ -480,9 +480,9 @@
     "semantic_hash": ""
   },
   "docs/02-planejamento-roadmap.md": {
-    "mtime": 1793191451.2860973,
-    "seen": 1793192426.0437338,
-    "ast_hash": "04b0fcb5f3fe99acc3016dfdeafc85ce",
+    "mtime": 1793193404.165705,
+    "seen": 1793193737.2333455,
+    "ast_hash": "c5bf0373a4b14ac853a5db8c954e6dd8",
     "semantic_hash": ""
   },
   "docs/03-convencoes-e-regras-para-agentes.md": {
@@ -492,9 +492,9 @@
     "semantic_hash": ""
   },
   "docs/04-contratos-api-e-eventos.md": {
-    "mtime": 1793191451.287032,
-    "seen": 1793192426.0437403,
-    "ast_hash": "c85827b02aa8e5a217dc0c230acd1ba2",
+    "mtime": 1793193401.9847136,
+    "seen": 1793193737.2333486,
+    "ast_hash": "f23f6b4966248e2e7955734cc299c429",
     "semantic_hash": ""
   },
   "docs/05-frontend-plano.md": {
@@ -510,14 +510,14 @@
     "semantic_hash": ""
   },
   "docs/07-orquestracao-de-agentes.md": {
-    "mtime": 1793192635.2851436,
-    "seen": 1793192645.589007,
+    "mtime": 1793193038.2442968,
+    "seen": 1793193043.9088233,
     "ast_hash": "0d772fb32beb18f551ad5f7eca17dffb",
     "semantic_hash": ""
   },
   "docs/README.md": {
-    "mtime": 1793192636.6911645,
-    "seen": 1793192645.5890112,
+    "mtime": 1793193038.2445474,
+    "seen": 1793193043.9088287,
     "ast_hash": "823a6f7b67bbbf26ab133996053e42d7",
     "semantic_hash": ""
   },
@@ -570,9 +570,135 @@
     "semantic_hash": ""
   },
   "docs/agents/agent-graph.md": {
-    "mtime": 1793192632.451102,
-    "seen": 1793192645.5890307,
+    "mtime": 1793193038.2445474,
+    "seen": 1793193046.7453742,
     "ast_hash": "aafd86a0d2e3e526fed841742310cc6c",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/package.json": {
+    "mtime": 1793193111.0430925,
+    "seen": 1793193737.2332542,
+    "ast_hash": "746b91cfc338f02963fbd4501063ba0d",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/prisma.config.ts": {
+    "mtime": 1793193114.7170439,
+    "seen": 1793193737.2332559,
+    "ast_hash": "79b0209d6004a6d08aae7cd94dbad576",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/prisma/migrations/20261028130000_init_inventory/migration.sql": {
+    "mtime": 1793193118.4699948,
+    "seen": 1793193737.2332575,
+    "ast_hash": "4af15794370856fb772671b4efa23529",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/domain/entities/InventoryItem.ts": {
+    "mtime": 1793193139.1527348,
+    "seen": 1793193737.233259,
+    "ast_hash": "0d47ae56a5997edbbd76a4e796d63d91",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/domain/entities/StockReservation.ts": {
+    "mtime": 1793193140.3587203,
+    "seen": 1793193737.2332604,
+    "ast_hash": "f3b59e8afd5e76ca9a2173de5a5cd81f",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/domain/errors/InventoryErrors.ts": {
+    "mtime": 1793193142.0536997,
+    "seen": 1793193737.2332618,
+    "ast_hash": "8b09871d3df22765feba5e55bfce3cb2",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/domain/repositories/IInventoryRepository.ts": {
+    "mtime": 1793193143.9036777,
+    "seen": 1793193737.233263,
+    "ast_hash": "435e175e9b3f8b15fb271c3dd12b100f",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/infra/container.ts": {
+    "mtime": 1793193246.4926457,
+    "seen": 1793193737.2332644,
+    "ast_hash": "8fcbe5603df87eff973fd0fa562e434b",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/infra/database/prisma.ts": {
+    "mtime": 1793193206.654002,
+    "seen": 1793193737.2332656,
+    "ast_hash": "f57f082b0619bcadbefed98b81fee0f1",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/infra/database/repositories/PrismaInventoryRepository.ts": {
+    "mtime": 1793193769.4465568,
+    "seen": 1793193789.08941,
+    "ast_hash": "a9356bdd370104430fdeccd7e9e017d0",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/infra/http/controllers/InventoryController.ts": {
+    "mtime": 1793193211.8189528,
+    "seen": 1793193737.2332685,
+    "ast_hash": "ab2c63a7d1184172e8a159b49889caa5",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/infra/http/middlewares/AuthMiddleware.ts": {
+    "mtime": 1793193210.3419666,
+    "seen": 1793193737.2332697,
+    "ast_hash": "6a3eb117256211075685c0effbc9d99e",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/infra/http/routes/inventoryRoutes.ts": {
+    "mtime": 1793193213.5279367,
+    "seen": 1793193737.2332711,
+    "ast_hash": "97baec384431a021e61167b350f2cd98",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/infra/messaging/InventoryEventWorker.ts": {
+    "mtime": 1793193244.5056622,
+    "seen": 1793193737.2332723,
+    "ast_hash": "1d832d920d569b38e1ac6eae8f9f9f4a",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/server.ts": {
+    "mtime": 1793193247.931634,
+    "seen": 1793193737.2332737,
+    "ast_hash": "f87abb80477975b57ca533c0880ab127",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/use-cases/GetStockBySkuUseCase.ts": {
+    "mtime": 1793193163.393452,
+    "seen": 1793193737.2332752,
+    "ast_hash": "7c7728979721ff5e6d914e75af65bda1",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/use-cases/InventoryUseCases.test.ts": {
+    "mtime": 1793193342.1529934,
+    "seen": 1793193737.2332766,
+    "ast_hash": "86e34587e8662bc388d2c5f6dae7157f",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/use-cases/ReleaseStockUseCase.ts": {
+    "mtime": 1793193166.5774164,
+    "seen": 1793193737.233278,
+    "ast_hash": "2667f92d332aa6d9b95de90757a075a9",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/use-cases/ReserveStockUseCase.ts": {
+    "mtime": 1793193165.2028897,
+    "seen": 1793193737.2332797,
+    "ast_hash": "36eb625ca50516dbb2a873c1b5f08474",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/src/use-cases/UpsertStockUseCase.ts": {
+    "mtime": 1793193161.5904722,
+    "seen": 1793193737.2332811,
+    "ast_hash": "a512b149cf53da29e0ba2ab7bcccd85f",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/tsconfig.json": {
+    "mtime": 1793193113.1430647,
+    "seen": 1793193737.2332826,
+    "ast_hash": "6ff21675ee3d32f6bd79cb401ed2452c",
     "semantic_hash": ""
   },
   "frontend/package-lock.json": {
@@ -585,6 +711,12 @@
     "mtime": 1793191451.2870972,
     "seen": 1793192426.0437565,
     "ast_hash": "d8951e14f18430d55c8871bd07586cba",
+    "semantic_hash": ""
+  },
+  "services/inventory-service/package-lock.json": {
+    "mtime": 1793193729.2984726,
+    "seen": 1793193737.2333696,
+    "ast_hash": "7f929bc7841f2278c95d06f739e00092",
     "semantic_hash": ""
   },
   "services/notification-service/package-lock.json": {

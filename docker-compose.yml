@@ -115,6 +115,28 @@ services:
     depends_on:
       - mongodb   
 
+  inventory-service:
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+    container_name: inventory-service
+    restart: unless-stopped
+    ports:
+      - "${INVENTORY_PORT:-3003}:${INVENTORY_PORT:-3003}"
+    environment:
+      - PORT=${INVENTORY_PORT:-3003}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/inventory_db?schema=public
+      - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+    networks:
+      - ecom_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
   api-gateway:
     image: nginx:1.27-alpine
     container_name: ecom_api_gateway
@@ -128,6 +150,7 @@ services:
     depends_on:
       - user-service
       - catalog-service
+      - inventory-service
 
   frontend:
     build:
