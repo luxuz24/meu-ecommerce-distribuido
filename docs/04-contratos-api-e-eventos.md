@@ -1,66 +1,82 @@
 # 04 — Contratos de API e Eventos
 
-Legenda: ✅ existe · 🕓 planejado
+Toda a API é acessada pelo **API Gateway** em `http://localhost:8080`; as portas dos serviços não
+são publicadas no host. O gateway aceita um `X-Correlation-ID` do cliente (ou gera um), devolve-o
+na resposta e o repassa aos serviços. Erros gerados pelo próprio gateway (429, 502–504) também são
+JSON: `{error, message, correlationId}`.
 
-## user-service — `http://localhost:3000` (ou via Gateway `http://localhost:8080`)
-| Método | Rota | Auth | Status | Descrição |
+Autenticação: `Authorization: Bearer <tokenJwt>` (HS256, payload `{userId,email,role}`, 1h).
+
+## Health
+| Rota | Descrição |
+|---|---|
+| `GET /health` | Gateway |
+| `GET /health/{user,catalog,inventory,order,payment}` | Health de cada serviço. Serviços da Saga retornam `{status, database, messaging}` e respondem **503** se banco ou RabbitMQ estiverem indisponíveis |
+
+## user-service
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| POST | `/users` | — | `{name(≥2), email, password(≥6)}` → 201 `{id,name,email,role:"CUSTOMER"}`; 400 se o e-mail existe. **Sempre cria CUSTOMER** (o campo `role` é ignorado). Limite: 10/min por IP |
+| POST | `/login` | — | `{email,password}` → 200 `{tokenJwt, user}`; 401. Limite: 10/min por IP |
+| GET | `/users/me` | usuário | → `{id,name,email,role}` |
+
+A conta ADMIN é provisionada no boot do user-service a partir de `ADMIN_EMAIL`/`ADMIN_PASSWORD`.
+
+## catalog-service
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/products` | — | `?page&limit&q&active` → `{items,total,page,limit,totalPages}` |
+| GET | `/api/products/:id` | — | → produto; 404 |
+| POST | `/api/products` | ADMIN | `{name,description,sku,price≥0,stock≥0}` → 201 |
+| PATCH | `/api/products/:id` | ADMIN | atualização parcial |
+| DELETE | `/api/products/:id` | ADMIN | soft delete (`isActive=false`) → 204 |
+
+## inventory-service
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/inventory` | — | lista de estoque |
+| GET | `/api/inventory/:sku` | — | `{id,productId,sku,availableQty,reservedQty,updatedAt}` |
+| POST | `/api/inventory/seed` | ADMIN | upsert `{productId,sku,availableQty}` |
+| POST | `/api/inventory/reserve` | ADMIN | operação manual/diagnóstico; o fluxo normal é o evento `order_created` |
+| POST | `/api/inventory/release/:orderId` | ADMIN | compensação manual; o fluxo normal é o evento `payment_failed` |
+
+## order-service
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| POST | `/api/orders` | usuário | `{items:[{productId, quantity}], simulatePaymentFailure?: boolean}` → 201 pedido `PENDING`. **Preço, nome e SKU vêm do catalog-service**; campos extras enviados pelo cliente são descartados. 422 produto inexistente/inativo · 503 catálogo indisponível |
+| GET | `/api/orders` | usuário | pedidos do usuário `{items,total}` |
+| GET | `/api/orders/:id` | dono ou ADMIN | 403 para outro cliente (anti-IDOR) |
+| PATCH | `/api/orders/:id/saga-event` | ADMIN | transição manual para operação/diagnóstico |
+
+## payment-service
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/payments/:orderId` | dono ou ADMIN | `{id,orderId,userId,amount,status,failureReason,createdAt}`; 403 / 404 |
+| POST | `/api/payments/process` | ADMIN | processamento manual; o fluxo normal é o evento `stock_reserved` |
+
+Regra antifraude: pagamentos acima de **R$ 50.000** são recusados.
+
+## Eventos — exchange `ecommerce_events` (topic, durable)
+
+Propriedades AMQP de toda mensagem publicada pela outbox: `messageId` = id da linha da outbox
+(chave de idempotência), `correlationId` = id da requisição que originou a cadeia,
+`persistent: true`. O corpo é o `payload` abaixo.
+
+| Evento | Routing key | Produtor | Consumidores | Payload |
 |---|---|---|---|---|
-| GET | `/health` | — | ✅ | `{status:"up",service:"user-service"}` |
-| POST | `/users` | — | ✅ | Body `{name(≥2), email, password(≥6), role?:"CUSTOMER"\|"ADMIN"}` → 201 `{id,name,email,role}`; 400 se e-mail existe |
-| POST | `/login` | — | ✅ | Body `{email,password}` → 200 `{tokenJwt, user:{id,name,email,role}}`; 401 `INVALID_CREDENTIALS!` |
-| GET | `/users/me` | Bearer JWT | ✅ | → `{id,name,email,role}`; 401/404 |
-| PATCH | `/users/me` | Bearer | 🕓 | Atualizar perfil |
+| USER_CREATED | `user_created` | user-service | notification | `{name,email,role}` |
+| ORDER_CREATED | `order_created` | order | inventory | `{orderId,userId,total,simulateOutcome?,items:[{productId,sku,name,price,quantity}]}` |
+| STOCK_RESERVED | `stock_reserved` | inventory | order, payment | `{orderId,reservationId,userId,total,simulateOutcome?,items}` |
+| STOCK_REJECTED | `stock_rejected` | inventory | order | `{orderId,reason,items}` — `reason`: `INSUFFICIENT_STOCK:<sku>` ou `SKU_NOT_FOUND:<sku>` |
+| STOCK_RELEASED | `stock_released` | inventory | — (auditoria) | `{orderId,items}` |
+| PAYMENT_APPROVED | `payment_approved` | payment | order | `{orderId,paymentId,userId,amount,status}` |
+| PAYMENT_FAILED | `payment_failed` | payment | order, inventory, notification | `{orderId,paymentId,userId,amount,status,reason}` |
+| ORDER_CONFIRMED | `order_confirmed` | order | inventory, notification | `{orderId,userId,total}` |
+| ORDER_CANCELLED | `order_cancelled` | order | notification | `{orderId,userId,reason}` |
 
-JWT: HS256, payload `{userId,email,role}`, expira em 1h, segredo `JWT_SECRET`. Header: `Authorization: Bearer <token>`.
-> Nota para o frontend: o campo do token se chama **`tokenJwt`** (não `token`).
+Cada fila de consumo tem uma DLQ (`<fila>_dlq`) ligada ao exchange `ecommerce_events_dlx`.
 
-## catalog-service — `http://localhost:3001` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`)
-| Método | Rota | Auth | Status | Descrição |
-|---|---|---|---|---|
-| GET | `/health` | — | ✅ | (sem prefixo `/api`) |
-| POST | `/api/products` | Bearer JWT (`ADMIN`) | ✅ | Body `{name,description,sku,price≥0,stock≥0}` → 201 produto; 400/401/403 |
-| GET | `/api/products` | — | ✅ | `?page&limit&q&active` → `{items, total, page, limit, totalPages}` |
-| GET | `/api/products/:id` | — | ✅ | Detalhe do produto → 200 produto; 404 não encontrado |
-| PATCH | `/api/products/:id` | Bearer JWT (`ADMIN`) | ✅ | Atualizar campos parciais → 200 produto; 400/401/403/404 |
-| DELETE | `/api/products/:id` | Bearer JWT (`ADMIN`) | ✅ | Soft delete (`isActive=false`) → 204; 401/403/404 |
-
-Produto: `{id, name, description, sku, price, stock, isActive, createdAt, updatedAt}`.
-
-## inventory-service — `http://localhost:3003` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`)
-| Método | Rota | Auth | Status | Descrição |
-|---|---|---|---|---|
-| GET | `/health` | — | ✅ | `{status:"up",service:"inventory-service"}` (sem prefixo `/api`) |
-| GET | `/api/inventory` | — | ✅ | Lista itens de estoque (`{items: [...]}`) |
-| GET | `/api/inventory/:sku` | — | ✅ | Consulta estoque por SKU → 200 `{id,productId,sku,availableQty,reservedQty,updatedAt}`; 404 |
-| POST | `/api/inventory/seed` | Bearer JWT (`ADMIN`) | ✅ | Upsert de estoque `{productId,sku,availableQty≥0}` → 200 |
-| POST | `/api/inventory/reserve` | — | ✅ | Reserva atômica `{orderId,messageId?,items:[{sku,quantity}]}` + gravação na `outbox` → 200 `STOCK_RESERVED` ou 409 `STOCK_REJECTED` |
-| POST | `/api/inventory/release/:orderId` | — | ✅ | Compensação: libera estoque reservado de `orderId` + grava `STOCK_RELEASED` na `outbox` |
-
-## order-service — `http://localhost:3004` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`)
-| Método | Rota | Auth | Status | Descrição |
-|---|---|---|---|---|
-| GET | `/health` | — | ✅ | `{status:"up",service:"order-service"}` (sem prefixo `/api`) |
-| POST | `/api/orders` | Bearer JWT | ✅ | Cria pedido (`PENDING`), calcula total no servidor e grava `ORDER_CREATED` na `outbox` → 201 |
-| GET | `/api/orders` | Bearer JWT | ✅ | Lista pedidos do usuário autenticado (`{items, total}`) → 200 |
-| GET | `/api/orders/:id` | Bearer JWT | ✅ | Detalhe do pedido (protegido contra IDOR; permite dono ou `ADMIN`) → 200 / 403 / 404 |
-| PATCH | `/api/orders/:id/saga-event` | Bearer JWT | ✅ | Transição da Saga (`STOCK_RESERVED`, `STOCK_REJECTED`, `PAYMENT_APPROVED`, `PAYMENT_FAILED`) → 200 |
-
-## payment-service — `http://localhost:3005` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`)
-| Método | Rota | Auth | Status | Descrição |
-|---|---|---|---|---|
-| GET | `/health` | — | ✅ | `{status:"up",service:"payment-service"}` (sem prefixo `/api`) |
-| GET | `/api/payments/:orderId` | — | ✅ | Consulta status do pagamento de um pedido → 200 `{id,orderId,userId,amount,status,failureReason,createdAt}`; 404 |
-| POST | `/api/payments/process` | — | ✅ | Processa pagamento (`{orderId,userId?,amount,simulateOutcome?,failureReason?}`) + grava `PAYMENT_APPROVED` ou `PAYMENT_FAILED` na `outbox` |
-
-## Eventos (RabbitMQ — exchange `ecommerce_events`, topic)
-| Evento | Routing key | Produtor | Consumidores | Status | Payload |
-|---|---|---|---|---|---|
-| USER_CREATED | `user_created` | user-service (outbox) | notification-service | ✅ | `{id,name,email}` |
-| PRODUCT_CREATED / UPDATED | `product_created` / `product_updated` | catalog | inventory | 🕓 | `{id,sku,price,stock}` |
-| ORDER_CREATED | `order_created` | order (outbox) | inventory | ✅ | `{orderId,userId,items:[{productId,sku,name,price,quantity}],total}` |
-| STOCK_RESERVED / STOCK_REJECTED | `stock_reserved` / `stock_rejected` | inventory (outbox) | order, payment | ✅ | `{orderId,reservationId?,reason?,items}` |
-| PAYMENT_APPROVED / PAYMENT_FAILED | `payment_approved` / `payment_failed` | payment (outbox) | order, notification, inventory | ✅ | `{orderId,paymentId,userId,amount,status,reason?}` |
-| ORDER_CONFIRMED / ORDER_CANCELLED | `order_confirmed` / `order_cancelled` | order (outbox) | notification, inventory | ✅ | `{orderId,userId,total?,reason?}` |
-
-Tabela outbox (Postgres): `id, aggregateType, aggregateId, eventType, payload(JSONB), published, createdAt`.
-Observação: o processor publica **apenas `payload`** como corpo; `messageId` = id da outbox (usar para idempotência).
+## Tabela outbox (Postgres)
+`id, aggregateType, aggregateId, eventType, payload (JSONB), published, createdAt` — nos serviços da Saga (order, inventory, payment) também `correlationId`.
+O relay publica pendentes em ordem de criação e só marca `published = true` após o publisher
+confirm do broker.

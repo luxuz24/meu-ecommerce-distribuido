@@ -7,6 +7,12 @@ export interface AuthenticatedPayload {
   role: 'CUSTOMER' | 'ADMIN';
 }
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    authUser?: AuthenticatedPayload;
+  }
+}
+
 export function verifyTokenHeader(authHeader: string | undefined, secret: string): AuthenticatedPayload {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new Error('MISSING_TOKEN');
@@ -41,6 +47,21 @@ export async function requireAdminAuth(request: FastifyRequest, reply: FastifyRe
       reply.status(403).send({ error: 'FORBIDDEN: Admin privileges required' });
       return;
     }
+    request.authUser = payload;
+  } catch {
+    reply.status(401).send({ error: 'UNAUTHORIZED: Invalid or missing Bearer token' });
+  }
+}
+
+export async function requireUserAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    reply.status(500).send({ error: 'CRITICAL: JWT_SECRET not configured' });
+    return;
+  }
+
+  try {
+    request.authUser = verifyTokenHeader(request.headers.authorization, secret);
   } catch {
     reply.status(401).send({ error: 'UNAUTHORIZED: Invalid or missing Bearer token' });
   }

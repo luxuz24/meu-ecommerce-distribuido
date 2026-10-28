@@ -4,10 +4,12 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { prisma } from './infra/database/prisma.js';
+import { runWithCorrelationId } from './infra/observability/correlation.js';
 import {
   inventoryController,
   reserveStockUseCase,
   releaseStockUseCase,
+  confirmStockUseCase,
 } from './infra/container.js';
 import { registerInventoryRoutes } from './infra/http/routes/inventoryRoutes.js';
 import { startInventoryMessaging } from './infra/messaging/InventoryEventWorker.js';
@@ -15,10 +17,21 @@ import { startInventoryMessaging } from './infra/messaging/InventoryEventWorker.
 const app = Fastify({
   logger: true,
   requestIdHeader: 'x-correlation-id',
+  // Atrás do API Gateway: o IP real do cliente vem no X-Forwarded-For. Sem isso o rate
+  // limit por IP enxergaria só o Nginx e viraria um limite global para todos os usuários.
+  trustProxy: 'loopback, uniquelocal',
 });
 
 const start = async () => {
   try {
+    // Conecta em background com retry: o HTTP sobe mesmo com o broker ainda indisponível
+    const rabbit = startInventoryMessaging(
+      prisma,
+      reserveStockUseCase,
+      releaseStockUseCase,
+      confirmStockUseCase
+    );
+
     await app.register(helmet);
 
     const rawOrigins =
@@ -49,6 +62,11 @@ const start = async () => {
       timeWindow: '1 minute',
     });
 
+    // Toda escrita na outbox feita durante esta requisição herda o X-Correlation-ID do gateway
+    app.addHook('onRequest', (request, _reply, done) => {
+      runWithCorrelationId(request.id, done);
+    });
+
     app.addHook('onSend', async (request, reply) => {
       reply.header('x-correlation-id', request.id);
     });
@@ -63,12 +81,17 @@ const start = async () => {
     });
 
     app.get('/health', async (_request, reply) => {
+      const messaging = rabbit?.isConnected ? 'connected' : 'disconnected';
+      let database = 'connected';
       try {
         await prisma.$queryRaw`SELECT 1`;
-        return { status: 'up', service: 'inventory-service', database: 'connected' };
       } catch {
-        return reply.status(503).send({ status: 'degraded', service: 'inventory-service', database: 'disconnected' });
+        database = 'disconnected';
       }
+      const healthy = database === 'connected' && messaging === 'connected';
+      return reply
+        .status(healthy ? 200 : 503)
+        .send({ status: healthy ? 'up' : 'degraded', service: 'inventory-service', database, messaging });
     });
 
     await app.register(
@@ -82,7 +105,6 @@ const start = async () => {
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`Inventory service running on port ${port}`);
 
-    await startInventoryMessaging(prisma, reserveStockUseCase, releaseStockUseCase);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

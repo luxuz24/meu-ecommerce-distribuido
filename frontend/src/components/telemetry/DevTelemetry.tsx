@@ -105,6 +105,14 @@ export const JsonInspectorDrawer: React.FC<{
                 {telemetry.latencyMs}ms
               </span>
             )}
+            {telemetry?.correlationId && (
+              <span
+                className="font-code-sm text-code-sm text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded shrink-0 hidden md:inline"
+                title={`X-Correlation-ID: ${telemetry.correlationId} (rastreie com: docker compose logs | grep ${telemetry.correlationId})`}
+              >
+                cid {telemetry.correlationId.slice(0, 8)}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 text-on-surface-variant shrink-0">
             <span className="font-code-sm text-code-sm hidden sm:inline">

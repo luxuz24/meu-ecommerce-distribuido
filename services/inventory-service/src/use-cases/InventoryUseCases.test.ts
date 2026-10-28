@@ -11,6 +11,7 @@ import {
 import { UpsertStockUseCase } from './UpsertStockUseCase.js';
 import { GetStockBySkuUseCase } from './GetStockBySkuUseCase.js';
 import { ReserveStockUseCase } from './ReserveStockUseCase.js';
+import { ConfirmStockUseCase } from './ConfirmStockUseCase.js';
 import { ReleaseStockUseCase } from './ReleaseStockUseCase.js';
 import { verifyTokenHeader } from '../infra/http/middlewares/AuthMiddleware.js';
 import jwt from 'jsonwebtoken';
@@ -107,6 +108,34 @@ class InMemoryInventoryRepository implements IInventoryRepository {
       orderId: input.orderId,
       reservation,
     };
+  }
+
+  async confirmOrderReservation(orderId: string, messageId?: string): Promise<boolean> {
+    if (messageId && this.processedMessages.has(messageId)) return false;
+    const existing = this.reservations.get(orderId);
+    if (!existing || existing.status !== 'RESERVED') return false;
+
+    for (const item of existing.items) {
+      const current = this.items.get(item.sku);
+      if (current) {
+        this.items.set(
+          item.sku,
+          new InventoryItem({
+            id: current.id,
+            productId: current.productId,
+            sku: current.sku,
+            availableQty: current.availableQty,
+            reservedQty: current.reservedQty - item.quantity,
+          })
+        );
+      }
+    }
+    this.reservations.set(
+      orderId,
+      new StockReservation({ id: existing.id, orderId, status: 'CONFIRMED', items: existing.items })
+    );
+    if (messageId) this.processedMessages.add(messageId);
+    return true;
   }
 
   async releaseOrderReservationWithOutbox(orderId: string, messageId?: string): Promise<boolean> {
@@ -274,6 +303,21 @@ describe('Inventory Service Use Cases & Saga Stock Reservation', () => {
     const restored = await getBySkuUseCase.execute('SKU-CHAIR');
     expect(restored.availableQty).toBe(5);
     expect(restored.reservedQty).toBe(0);
+  });
+
+  it('should turn a reservation into a final stock deduction on ORDER_CONFIRMED', async () => {
+    const confirmUseCase = new ConfirmStockUseCase(repo);
+    await upsertUseCase.execute({ productId: 'p1', sku: 'SKU-OK', availableQty: 10 });
+    await reserveUseCase.execute({ orderId: 'o-paid', items: [{ sku: 'SKU-OK', quantity: 4 }] });
+
+    expect(await confirmUseCase.execute('o-paid', 'msg-confirm-1')).toBe(true);
+    // Reentrega da mesma mensagem e compensação tardia não podem mexer no estoque
+    expect(await confirmUseCase.execute('o-paid', 'msg-confirm-1')).toBe(false);
+    expect(await releaseUseCase.execute('o-paid', 'late-payment-failed')).toBe(false);
+
+    const stock = await getBySkuUseCase.execute('SKU-OK');
+    expect(stock.availableQty).toBe(6);
+    expect(stock.reservedQty).toBe(0);
   });
 
   it('should validate HS256 JWT token for Admin inventory seeding', () => {

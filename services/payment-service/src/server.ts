@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { prisma } from './infra/database/prisma.js';
+import { runWithCorrelationId } from './infra/observability/correlation.js';
 import { paymentController, processPaymentUseCase } from './infra/container.js';
 import { registerPaymentRoutes } from './infra/http/routes/paymentRoutes.js';
 import { startPaymentMessaging } from './infra/messaging/PaymentEventWorker.js';
@@ -11,10 +12,16 @@ import { startPaymentMessaging } from './infra/messaging/PaymentEventWorker.js';
 const app = Fastify({
   logger: true,
   requestIdHeader: 'x-correlation-id',
+  // Atrás do API Gateway: o IP real do cliente vem no X-Forwarded-For. Sem isso o rate
+  // limit por IP enxergaria só o Nginx e viraria um limite global para todos os usuários.
+  trustProxy: 'loopback, uniquelocal',
 });
 
 const start = async () => {
   try {
+    // Conecta em background com retry: o HTTP sobe mesmo com o broker ainda indisponível
+    const rabbit = startPaymentMessaging(prisma, processPaymentUseCase);
+
     await app.register(helmet);
 
     const rawOrigins =
@@ -45,6 +52,11 @@ const start = async () => {
       timeWindow: '1 minute',
     });
 
+    // Toda escrita na outbox feita durante esta requisição herda o X-Correlation-ID do gateway
+    app.addHook('onRequest', (request, _reply, done) => {
+      runWithCorrelationId(request.id, done);
+    });
+
     app.addHook('onSend', async (request, reply) => {
       reply.header('x-correlation-id', request.id);
     });
@@ -59,12 +71,17 @@ const start = async () => {
     });
 
     app.get('/health', async (_request, reply) => {
+      const messaging = rabbit?.isConnected ? 'connected' : 'disconnected';
+      let database = 'connected';
       try {
         await prisma.$queryRaw`SELECT 1`;
-        return { status: 'up', service: 'payment-service', database: 'connected' };
       } catch {
-        return reply.status(503).send({ status: 'degraded', service: 'payment-service', database: 'disconnected' });
+        database = 'disconnected';
       }
+      const healthy = database === 'connected' && messaging === 'connected';
+      return reply
+        .status(healthy ? 200 : 503)
+        .send({ status: healthy ? 'up' : 'degraded', service: 'payment-service', database, messaging });
     });
 
     await app.register(
@@ -78,7 +95,6 @@ const start = async () => {
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`Payment service running on port ${port}`);
 
-    await startPaymentMessaging(prisma, processPaymentUseCase);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

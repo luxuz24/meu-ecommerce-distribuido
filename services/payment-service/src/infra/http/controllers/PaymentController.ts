@@ -1,5 +1,8 @@
 import { type FastifyReply, type FastifyRequest } from 'fastify';
-import { PaymentNotFoundError } from '../../../domain/errors/PaymentErrors.js';
+import {
+  PaymentAccessDeniedError,
+  PaymentNotFoundError,
+} from '../../../domain/errors/PaymentErrors.js';
 import {
   type GetPaymentByOrderIdUseCase,
   type ProcessPaymentUseCase,
@@ -15,14 +18,24 @@ export class PaymentController {
     request: FastifyRequest<{ Params: { orderId: string } }>,
     reply: FastifyReply
   ): Promise<void> {
+    if (!request.authUser) {
+      reply.status(401).send({ error: 'UNAUTHORIZED' });
+      return;
+    }
+
     try {
-      const payment = await this.getPaymentByOrderIdUseCase.execute(
-        request.params.orderId
-      );
+      const payment = await this.getPaymentByOrderIdUseCase.execute(request.params.orderId, {
+        userId: request.authUser.userId,
+        role: request.authUser.role,
+      });
       reply.status(200).send(payment);
     } catch (err) {
       if (err instanceof PaymentNotFoundError) {
         reply.status(404).send({ error: err.message });
+        return;
+      }
+      if (err instanceof PaymentAccessDeniedError) {
+        reply.status(403).send({ error: err.message });
         return;
       }
       throw err;

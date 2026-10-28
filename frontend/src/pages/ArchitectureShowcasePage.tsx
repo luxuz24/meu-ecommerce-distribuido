@@ -18,7 +18,7 @@ const SERVICES_TOPOLOGY: ServiceCard[] = [
     id: 'user-service',
     name: 'User Service',
     port: 3000,
-    db: 'user_db / ecommerce',
+    db: 'user_db',
     dbType: 'PostgreSQL',
     role: 'Identidade, Cadastro com hash bcrypt, Autenticação JWT (HS256) e RBAC (CUSTOMER / ADMIN).',
     endpoints: ['POST /users', 'POST /login', 'GET /users/me', 'GET /health'],
@@ -49,7 +49,7 @@ const SERVICES_TOPOLOGY: ServiceCard[] = [
     db: 'inventory_db',
     dbType: 'PostgreSQL',
     role: 'Gestão de Estoque e Reserva Atômica. Consome order_created da Saga, reserva itens ou rejeita com fallback transacional e tabela de idempotência.',
-    endpoints: ['GET /api/inventory', 'GET /api/inventory/:sku', 'POST /api/inventory/seed', 'POST /api/inventory/reserve', 'POST /api/inventory/release/:orderId'],
+    endpoints: ['GET /api/inventory', 'GET /api/inventory/:sku', 'POST /api/inventory/seed (Admin)', 'Evento: order_created → reserva', 'Evento: payment_failed → estorno', 'Evento: order_confirmed → baixa'],
     events: {
       emits: ['stock_reserved', 'stock_rejected'],
       consumes: ['order_created', 'payment_failed (compensação/libera estoque)'],
@@ -62,8 +62,8 @@ const SERVICES_TOPOLOGY: ServiceCard[] = [
     port: 3004,
     db: 'order_db',
     dbType: 'PostgreSQL',
-    role: 'Orquestração do Pedido e Máquina de Estados da Saga (PENDING → STOCK_RESERVED → PAID / CANCELLED). Cálculo estrito de total no servidor e anti-IDOR.',
-    endpoints: ['POST /api/orders', 'GET /api/orders', 'GET /api/orders/:id', 'POST /api/orders/:id/events'],
+    role: 'Inicia a Saga e aplica seu desfecho na máquina de estados (PENDING → STOCK_RESERVED → PAID / CANCELLED). Preço, nome e SKU resolvidos no catalog-service; anti-IDOR.',
+    endpoints: ['POST /api/orders {productId, quantity}', 'GET /api/orders', 'GET /api/orders/:id (dono ou Admin)', 'Eventos: stock_* / payment_* → status'],
     events: {
       emits: ['order_created', 'order_confirmed', 'order_cancelled'],
       consumes: ['stock_reserved', 'stock_rejected', 'payment_approved', 'payment_failed'],
@@ -77,7 +77,7 @@ const SERVICES_TOPOLOGY: ServiceCard[] = [
     db: 'payment_db',
     dbType: 'PostgreSQL',
     role: 'Processamento de Pagamento com regra antifraude, persistência idempotente na Outbox e simulação de aprovação/recusa para acionar a Saga.',
-    endpoints: ['GET /api/payments/:orderId', 'POST /api/payments/process'],
+    endpoints: ['GET /api/payments/:orderId (dono ou Admin)', 'Evento: stock_reserved → cobrança'],
     events: {
       emits: ['payment_approved', 'payment_failed'],
       consumes: ['stock_reserved'],

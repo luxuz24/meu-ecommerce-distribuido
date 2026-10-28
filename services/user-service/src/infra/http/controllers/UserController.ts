@@ -25,7 +25,6 @@ export async function userRoutes(app: FastifyInstance) {
             name: { type: 'string', minLength: 2 },
             email: { type: 'string', format: 'email' },
             password: { type: 'string', minLength: 6 },
-            role: { type: 'string', enum: ['CUSTOMER', 'ADMIN'] },
           },
         },
         response: {
@@ -42,9 +41,10 @@ export async function userRoutes(app: FastifyInstance) {
       },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { name, email, password, role } = request.body as any;
+      const { name, email, password } = request.body as any;
       try {
-        const user = await createUserUseCase.execute(name, email, password, role ?? 'CUSTOMER');
+        // Cadastro público nunca escolhe papel: privilégio ADMIN só via bootstrap do servidor
+        const user = await createUserUseCase.execute(name, email, password, 'CUSTOMER');
         return reply.status(201).send(user);
       } catch (error: any) {
         if (error instanceof UserAlreadyExistsError) {

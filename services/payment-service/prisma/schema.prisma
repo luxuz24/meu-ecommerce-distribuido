@@ -26,6 +26,7 @@ model Outbox {
   eventType     String
   payload       Json
   published     Boolean  @default(false)
+  correlationId String?
   createdAt     DateTime @default(now())
 
   @@map("outbox")

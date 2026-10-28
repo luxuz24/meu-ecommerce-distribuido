@@ -18,3 +18,17 @@ export class InvalidOrderTransitionError extends Error {
     this.name = 'InvalidOrderTransitionError';
   }
 }
+
+export class ProductUnavailableError extends Error {
+  constructor(productId: string) {
+    super(`PRODUCT_UNAVAILABLE: Product ${productId} does not exist or is inactive`);
+    this.name = 'ProductUnavailableError';
+  }
+}
+
+export class CatalogUnavailableError extends Error {
+  constructor() {
+    super('CATALOG_UNAVAILABLE: Could not resolve product prices from catalog-service');
+    this.name = 'CatalogUnavailableError';
+  }
+}

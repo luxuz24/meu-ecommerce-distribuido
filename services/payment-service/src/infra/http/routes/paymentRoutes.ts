@@ -1,6 +1,6 @@
 import { type FastifyInstance } from 'fastify';
 import { type PaymentController } from '../controllers/PaymentController.js';
-import { requireAdminAuth } from '../middlewares/AuthMiddleware.js';
+import { requireAdminAuth, requireUserAuth } from '../middlewares/AuthMiddleware.js';
 
 export async function registerPaymentRoutes(
   app: FastifyInstance,
@@ -9,7 +9,7 @@ export async function registerPaymentRoutes(
   app.get<{ Params: { orderId: string } }>(
     '/payments/:orderId',
     {
-      preHandler: [requireAdminAuth],
+      preHandler: [requireUserAuth],
       schema: {
         params: {
           type: 'object',

@@ -39,6 +39,8 @@ function statusBadgeStyle(status: OrderStatus): {
   }
 }
 
+const SAGA_POLL_INTERVAL_MS = 1500;
+
 export const OrdersPage: React.FC = () => {
   const { user, tokenJwt: token } = useAuth();
   const { items, totalPrice, updateQuantity, removeItem, clearCart } =
@@ -53,25 +55,40 @@ export const OrdersPage: React.FC = () => {
     message: string;
   } | null>(null);
 
-  const fetchOrders = useCallback(async () => {
-    if (!token) return;
-    setLoadingOrders(true);
-    try {
-      const res = await orderApi.listMyOrders(token);
-      setOrders(res.data.items);
-      setTelemetry(res.telemetry);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setTelemetry(err.telemetry);
+  // `silent`: atualização de fundo (polling) sem spinner nem troca da telemetria exibida
+  const fetchOrders = useCallback(
+    async (silent = false) => {
+      if (!token) return;
+      if (!silent) setLoadingOrders(true);
+      try {
+        const res = await orderApi.listMyOrders(token);
+        setOrders(res.data.items);
+        if (!silent) setTelemetry(res.telemetry);
+      } catch (err) {
+        if (err instanceof ApiError && !silent) {
+          setTelemetry(err.telemetry);
+        }
+      } finally {
+        if (!silent) setLoadingOrders(false);
       }
-    } finally {
-      setLoadingOrders(false);
-    }
-  }, [token]);
+    },
+    [token]
+  );
 
   useEffect(() => {
     void fetchOrders();
   }, [fetchOrders]);
+
+  // A Saga é assíncrona: enquanto houver pedido em andamento, acompanha o status
+  // sozinho até PAID/CANCELLED, sem o usuário precisar clicar em "Atualizar".
+  const hasSagaInFlight = orders.some(
+    (o) => o.status === 'PENDING' || o.status === 'STOCK_RESERVED'
+  );
+  useEffect(() => {
+    if (!hasSagaInFlight) return;
+    const timer = setInterval(() => void fetchOrders(true), SAGA_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [hasSagaInFlight, fetchOrders]);
 
   const handleCheckout = async () => {
     if (!token || !user) {
@@ -88,12 +105,10 @@ export const OrdersPage: React.FC = () => {
     try {
       const res = await orderApi.createOrder(
         {
-          simulateOutcome: simulateFailure ? 'FAILED' : 'APPROVED',
+          ...(simulateFailure ? { simulatePaymentFailure: true } : {}),
+          // Preço, nome e SKU são resolvidos pelo order-service no catálogo
           items: items.map((i) => ({
             productId: i.product.id,
-            sku: i.product.sku,
-            name: i.product.name,
-            price: i.product.price,
             quantity: i.quantity,
           })),
         },

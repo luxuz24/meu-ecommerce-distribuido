@@ -32,6 +32,7 @@ describe('Frontend MVP — Domain & API Client', () => {
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
+        headers: new Headers({ 'x-correlation-id': 'cid-gateway-123' }),
         json: async () => mockPayload,
       })
     );
@@ -51,6 +52,7 @@ describe('Frontend MVP — Domain & API Client', () => {
     );
     expect(res.telemetry.statusCode).toBe(200);
     expect(res.telemetry.latencyMs).toBeGreaterThanOrEqual(1);
+    expect(res.telemetry.correlationId).toBe('cid-gateway-123');
 
     vi.unstubAllGlobals();
   });
@@ -61,6 +63,7 @@ describe('Frontend MVP — Domain & API Client', () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
+        headers: new Headers(),
         json: async () => ({ error: 'INVALID_CREDENTIALS!' }),
       })
     );

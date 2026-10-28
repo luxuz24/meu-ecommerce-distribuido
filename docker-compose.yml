@@ -33,7 +33,12 @@ services:
       - "27017:27017"
     networks:
       - ecom_network
-
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: ecom_rabbitmq
@@ -48,25 +53,36 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - ecom_network
-
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
   user-service:
     build:
       context: ./services/user-service
       dockerfile: Dockerfile
     container_name: user-service
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/user_db?schema=public
       - JWT_SECRET=${JWT_SECRET}
       - PORT=${PORT}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@microstore.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-AdminPassword123!}
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
   user-outbox-processor:
     build:
       context: ./services/user-outbox-processor
@@ -74,15 +90,21 @@ services:
     container_name: user-outbox-processor
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/user_db?schema=public
       - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/user-outbox-processor.ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started   
+        condition: service_healthy
   notification-service:
     build:
       context: ./services/notification-service
@@ -93,18 +115,21 @@ services:
       - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/notification-service.ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       rabbitmq:
-        condition: service_started   
-
+        condition: service_healthy
   catalog-service:
     build:
       context: ./services/catalog-service
       dockerfile: Dockerfile
     container_name: catalog-service
     restart: unless-stopped
-    ports:
-      - "${CATALOG_PORT:-3001}:${CATALOG_PORT:-3001}"
     environment:
       - PORT=${CATALOG_PORT:-3001}
       - MONGO_URI=mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASS}@mongodb:27017/catalog_db?authSource=admin
@@ -112,17 +137,21 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${CATALOG_PORT:-3001}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
-      - mongodb   
-
+      mongodb:
+        condition: service_healthy
   inventory-service:
     build:
       context: ./services/inventory-service
       dockerfile: Dockerfile
     container_name: inventory-service
     restart: unless-stopped
-    ports:
-      - "${INVENTORY_PORT:-3003}:${INVENTORY_PORT:-3003}"
     environment:
       - PORT=${INVENTORY_PORT:-3003}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/inventory_db?schema=public
@@ -131,42 +160,51 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${INVENTORY_PORT:-3003}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-
+        condition: service_healthy
   order-service:
     build:
       context: ./services/order-service
       dockerfile: Dockerfile
     container_name: order-service
     restart: unless-stopped
-    ports:
-      - "${ORDER_PORT:-3004}:${ORDER_PORT:-3004}"
     environment:
       - PORT=${ORDER_PORT:-3004}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/order_db?schema=public
       - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
+      - CATALOG_SERVICE_URL=http://catalog-service:${CATALOG_PORT:-3001}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${ORDER_PORT:-3004}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
   payment-service:
     build:
       context: ./services/payment-service
       dockerfile: Dockerfile
     container_name: payment-service
     restart: unless-stopped
-    ports:
-      - "${PAYMENT_PORT:-3005}:${PAYMENT_PORT:-3005}"
     environment:
       - PORT=${PAYMENT_PORT:-3005}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db?schema=public
@@ -175,12 +213,17 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - ecom_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${PAYMENT_PORT:-3005}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-
+        condition: service_healthy
   api-gateway:
     image: nginx:1.27-alpine
     container_name: ecom_api_gateway
@@ -192,30 +235,32 @@ services:
     networks:
       - ecom_network
     depends_on:
-      - user-service
-      - catalog-service
-      - inventory-service
-      - order-service
-      - payment-service
-
+      user-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
     container_name: microstore-frontend
     restart: unless-stopped
     ports:
       - "3002:3002"
-    environment:
-      - VITE_USER_API_URL=http://localhost:3000
-      - VITE_CATALOG_API_URL=http://localhost:3001
-      - VITE_DEV_TELEMETRY=true
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_GATEWAY_URL=http://localhost:8080
+        - VITE_DEV_TELEMETRY=true
     networks:
       - ecom_network
     depends_on:
-      - user-service
-      - catalog-service
-
+      api-gateway:
+        condition: service_started
 networks:
   ecom_network:
     driver: bridge
