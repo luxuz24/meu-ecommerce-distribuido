@@ -68,10 +68,10 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 ### Fase 4 — Novos serviços (bancos já provisionados)
 - ✅ **inventory-service** (`inventory_db`): estoque/reservas em Clean Architecture (`InventoryItem`, `StockReservation`, `Outbox`, `ProcessedMessage` para idempotência); consome `ORDER_CREATED` e `PAYMENT_FAILED`, emite `STOCK_RESERVED`/`STOCK_REJECTED`
 - ✅ **order-service** (`order_db`): pedidos em Clean Architecture (`Order`, `OrderItem`, `Outbox`, `ProcessedMessage`), cálculo de total no servidor, proteção anti-IDOR, Saga (`PENDING` → `STOCK_RESERVED` → `PAID` / `CANCELLED`) e tela `/orders` + Carrinho no Frontend
-- ⬜ **payment-service** (`payment_db`): pagamento simulado; consome `STOCK_RESERVED`, emite `PAYMENT_APPROVED/FAILED`
-- 🟡 Saga coreografada: Order → Inventory → Payment → Order (confirmação/compensação)
-- ⬜ Estender notification-service: pedido confirmado, pagamento falhou
-- 🟡 Cada serviço: Dockerfile, entrada no compose, `.env.example`, migrations, testes
+- ✅ **payment-service** (`payment_db`): pagamento em Clean Architecture (`Payment`, `Outbox`, `ProcessedMessage`); consome `STOCK_RESERVED`, emite `PAYMENT_APPROVED`/`PAYMENT_FAILED`
+- ✅ Saga coreografada: Order → Inventory → Payment → Order (confirmação/compensação completa)
+- ✅ Estender notification-service: pedido confirmado (`order_confirmed`), pagamento falhou (`payment_failed`) e pedido cancelado (`order_cancelled`)
+- ✅ Cada serviço: Dockerfile, entrada no compose, `.env.example`, migrations, testes
 
 ### Fase 5 — Resiliência e observabilidade
 - ✅ Idempotência nos consumidores (tabela `processed_messages` / `messageId` implementada no `inventory-service` e `order-service`)

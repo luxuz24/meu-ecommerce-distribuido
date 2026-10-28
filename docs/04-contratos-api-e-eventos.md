@@ -45,8 +45,12 @@ Produto: `{id, name, description, sku, price, stock, isActive, createdAt, update
 | GET | `/api/orders/:id` | Bearer JWT | ✅ | Detalhe do pedido (protegido contra IDOR; permite dono ou `ADMIN`) → 200 / 403 / 404 |
 | PATCH | `/api/orders/:id/saga-event` | Bearer JWT | ✅ | Transição da Saga (`STOCK_RESERVED`, `STOCK_REJECTED`, `PAYMENT_APPROVED`, `PAYMENT_FAILED`) → 200 |
 
-## payment-service 🕓
-Contratos serão definidos na Fase 4.3 (`GET /api/payments/:orderId`, `POST /api/payments/process`).
+## payment-service — `http://localhost:3005` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`)
+| Método | Rota | Auth | Status | Descrição |
+|---|---|---|---|---|
+| GET | `/health` | — | ✅ | `{status:"up",service:"payment-service"}` (sem prefixo `/api`) |
+| GET | `/api/payments/:orderId` | — | ✅ | Consulta status do pagamento de um pedido → 200 `{id,orderId,userId,amount,status,failureReason,createdAt}`; 404 |
+| POST | `/api/payments/process` | — | ✅ | Processa pagamento (`{orderId,userId?,amount,simulateOutcome?,failureReason?}`) + grava `PAYMENT_APPROVED` ou `PAYMENT_FAILED` na `outbox` |
 
 ## Eventos (RabbitMQ — exchange `ecommerce_events`, topic)
 | Evento | Routing key | Produtor | Consumidores | Status | Payload |
@@ -55,8 +59,8 @@ Contratos serão definidos na Fase 4.3 (`GET /api/payments/:orderId`, `POST /api
 | PRODUCT_CREATED / UPDATED | `product_created` / `product_updated` | catalog | inventory | 🕓 | `{id,sku,price,stock}` |
 | ORDER_CREATED | `order_created` | order (outbox) | inventory | ✅ | `{orderId,userId,items:[{productId,sku,name,price,quantity}],total}` |
 | STOCK_RESERVED / STOCK_REJECTED | `stock_reserved` / `stock_rejected` | inventory (outbox) | order, payment | ✅ | `{orderId,reservationId?,reason?,items}` |
-| PAYMENT_APPROVED / PAYMENT_FAILED | `payment_approved` / `payment_failed` | payment | order, notification, inventory | 🟡 (order e inventory prontos) | `{orderId,paymentId,reason?}` |
-| ORDER_CONFIRMED / ORDER_CANCELLED | `order_confirmed` / `order_cancelled` | order (outbox) | notification, inventory | ✅ (produtor pronto) | `{orderId,userId,total?,reason?}` |
+| PAYMENT_APPROVED / PAYMENT_FAILED | `payment_approved` / `payment_failed` | payment (outbox) | order, notification, inventory | ✅ | `{orderId,paymentId,userId,amount,status,reason?}` |
+| ORDER_CONFIRMED / ORDER_CANCELLED | `order_confirmed` / `order_cancelled` | order (outbox) | notification, inventory | ✅ | `{orderId,userId,total?,reason?}` |
 
 Tabela outbox (Postgres): `id, aggregateType, aggregateId, eventType, payload(JSONB), published, createdAt`.
 Observação: o processor publica **apenas `payload`** como corpo; `messageId` = id da outbox (usar para idempotência).

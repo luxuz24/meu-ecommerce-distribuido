@@ -1,17 +1,17 @@
 # Graph Report - ecommerce_micro  (2026-10-28)
 
 ## Corpus Check
-- 137 files · ~37,068 words
+- 153 files · ~39,663 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 38 file(s) not represented in the graph (top: (none) 22, .example 8, .toml 3)
+- Unclassified: 43 file(s) not represented in the graph (top: (none) 24, .example 9, .toml 4)
 
 ## Summary
-- 1231 nodes · 2229 edges · 75 communities (58 shown, 17 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 94 edges (avg confidence: 0.89)
+- 1370 nodes · 2484 edges · 74 communities (60 shown, 14 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 103 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `17802b8b`
+- Built from commit: `de831989`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,7 +19,7 @@
 - User
 - CreateProductUseCase.test.ts
 - CatalogPage.tsx
-- dotenv
+- ref_fastify
 - catalog-service/package.json
 - user-outbox-processor/package.json
 - steps
@@ -39,6 +39,7 @@
 - mongodb
 - rabbitmq
 - services
+- ref_dotenv
 - 03 — Convenções e Regras para Agentes
 - 07 — Orquestração de Agentes por Tarefa
 - 3. Regras Obrigatórias (SOLID, Clean Architecture e Segurança)
@@ -46,8 +47,8 @@
 - user-service/package.json
 - api-gateway
 - context
-- LoginUseCase.test.ts
-- user-outbox-processor
+- payment-service/package.json
+- compilerOptions
 - catalog-service
 - frontend
 - 01 — Visão e Arquitetura
@@ -59,14 +60,14 @@
 - scripts
 - Docs — Guia para Agentes de Desenvolvimento
 - init-databases.sh
-- user-service/src/infra/container.ts
+- payment-service
 - InventoryUseCases.test.ts
 - inventory-service/package.json
 - B. O que falta (por fase)
 - 20260722053928_setup_user_and_outbox_schema/migration.sql
 - compilerOptions
 - Order
-- IUserRepository
+- 20261028150000_init_payments/migration.sql
 - postgres
 - 20261028130000_init_inventory/migration.sql
 - inventory-service
@@ -81,21 +82,23 @@
 - compilerOptions
 - order-service
 - 20261028140000_init_orders/migration.sql
-- FakePasswordHasher
+- notification-service
 
 ## God Nodes (most connected - your core abstractions)
 1. `Product` - 26 edges
 2. `User` - 25 edges
 3. `Order` - 24 edges
-4. `InventoryItem` - 23 edges
-5. `IProductRepository` - 22 edges
-6. `IUserRepository` - 22 edges
-7. `scripts` - 21 edges
+4. `scripts` - 23 edges
+5. `InventoryItem` - 23 edges
+6. `IProductRepository` - 22 edges
+7. `IUserRepository` - 22 edges
 8. `IInventoryRepository` - 20 edges
 9. `DevOnly()` - 18 edges
 10. `compilerOptions` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Tarefa C — Fase 4.3: Microsserviço de Pagamento (`payment-service` + `payment_db`)` --references--> `ProcessPaymentUseCase`  [INFERRED]
+  docs/07-orquestracao-de-agentes.md → services/payment-service/src/use-cases/PaymentUseCases.ts
 - `2. Estratégia de Testes do Monorepo` --references--> `ApiError`  [INFERRED]
   docs/agents/agent-qa-tests.md → frontend/src/services/api.ts
 - `Estado real da Clean Architecture` --references--> `IProductRepository`  [INFERRED]
@@ -104,33 +107,31 @@
   docs/01-visao-e-arquitetura.md → services/catalog-service/src/infra/database/repositories/MongoProductRepository.ts
 - `2. SOLID aplicado ao projeto` --references--> `MongoProductRepository`  [INFERRED]
   docs/06-fluxo-solid-e-seguranca.md → services/catalog-service/src/infra/database/repositories/MongoProductRepository.ts
-- `2. SOLID aplicado ao projeto` --references--> `InMemoryProductRepository`  [INFERRED]
-  docs/06-fluxo-solid-e-seguranca.md → services/catalog-service/src/use-cases/CreateProductUseCase.test.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (75 total, 17 thin omitted)
+## Communities (74 total, 14 thin omitted)
 
 ### Community 0 - "User"
-Cohesion: 0.14
-Nodes (10): User, UserProps, UserNotFoundError, CreateOutboxData, CreateUserData, PrismaUserRepository, InMemoryUserRepository, GetUserProfileUseCase (+2 more)
+Cohesion: 0.05
+Nodes (39): Estado real da Clean Architecture, Fase 1 — Clean Architecture no user-service, 2. SOLID aplicado ao projeto, 2. Estratégia de Testes do Monorepo, User, UserProps, UserRole, InvalidCredentialsError (+31 more)
 
 ### Community 1 - "CreateProductUseCase.test.ts"
 Cohesion: 0.07
-Nodes (29): mongoose, Product, ProductProps, InvalidProductDataError, ProductAlreadyExistsError, ProductNotFoundError, CreateProductDTO, IProductRepository (+21 more)
+Nodes (28): Product, ProductProps, InvalidProductDataError, ProductAlreadyExistsError, ProductNotFoundError, CreateProductDTO, IProductRepository, ListProductsParams (+20 more)
 
 ### Community 2 - "CatalogPage.tsx"
-Cohesion: 0.11
-Nodes (55): App(), AppLayout(), DevOnly(), EndpointBar(), JsonInspectorDrawer(), AuthContext, AuthContextValue, AuthProvider() (+47 more)
+Cohesion: 0.09
+Nodes (64): dependencies, react@^19.0.0, react-dom@^19.0.0, react-router-dom@^7.1.5, App(), AppLayout(), DevOnly(), EndpointBar() (+56 more)
 
-### Community 3 - "dotenv"
-Cohesion: 0.07
-Nodes (21): productController, connectDB(), CatalogTokenPayload, requireAdminAuth(), verifyCatalogJwt(), productRoutes(), app, start() (+13 more)
+### Community 3 - "ref_fastify"
+Cohesion: 0.06
+Nodes (35): productController, connectDB(), CatalogTokenPayload, requireAdminAuth(), verifyCatalogJwt(), productRoutes(), app, start() (+27 more)
 
 ### Community 4 - "catalog-service/package.json"
 Cohesion: 0.07
-Nodes (38): author, dependencies, dotenv@^17.4.2, fastify@^5.10.0, @fastify/cors@^11.3.1, @fastify/helmet@^13.2.0, @fastify/rate-limit@^11.2.1, jsonwebtoken@^9.0.3 (+30 more)
+Nodes (39): mongoose, author, dependencies, dotenv@^17.4.2, fastify@^5.10.0, @fastify/cors@^11.3.1, @fastify/helmet@^13.2.0, @fastify/rate-limit@^11.2.1 (+31 more)
 
 ### Community 5 - "user-outbox-processor/package.json"
 Cohesion: 0.07
@@ -141,8 +142,8 @@ Cohesion: 0.08
 Nodes (32): name, runs-on, steps, name, runs-on, steps, jobs, docker-build (+24 more)
 
 ### Community 7 - "frontend/package.json"
-Cohesion: 0.07
-Nodes (34): dependencies, react@^19.0.0, react-dom@^19.0.0, react-router-dom@^7.1.5, devDependencies, autoprefixer@^10.4.20, postcss@^8.5.1, tailwindcss@^3.4.17 (+26 more)
+Cohesion: 0.09
+Nodes (29): devDependencies, autoprefixer@^10.4.20, postcss@^8.5.1, tailwindcss@^3.4.17, @types/react@^19.0.8, @types/react-dom@^19.0.3, typescript@^5.7.3, vite@^6.1.0 (+21 more)
 
 ### Community 8 - "notification-service/package.json"
 Cohesion: 0.08
@@ -157,8 +158,8 @@ Cohesion: 0.10
 Nodes (19): compilerOptions, declaration, declarationMap, exactOptionalPropertyTypes, isolatedModules, jsx, module, moduleDetection (+11 more)
 
 ### Community 11 - "scripts"
-Cohesion: 0.08
-Nodes (25): description, name, private, scripts, build, build:catalog, build:frontend, build:inventory (+17 more)
+Cohesion: 0.07
+Nodes (27): description, name, private, scripts, build, build:catalog, build:frontend, build:inventory (+19 more)
 
 ### Community 12 - "compilerOptions"
 Cohesion: 0.11
@@ -204,9 +205,13 @@ Nodes (10): RABBITMQ_DEFAULT_PASS, RABBITMQ_DEFAULT_USER, container_name, enviro
 Cohesion: 0.22
 Nodes (8): driver, networks, ecom_network, services, volumes, mongo_data, pg_data, rabbitmq_data
 
+### Community 23 - "ref_dotenv"
+Cohesion: 0.10
+Nodes (12): adapter, pool, NotificationAction, parseNotificationEvent(), startConsumer(), pool, processOutboxEvents(), RABBITMQ_URL (+4 more)
+
 ### Community 25 - "03 — Convenções e Regras para Agentes"
-Cohesion: 0.22
-Nodes (8): 03 — Convenções e Regras para Agentes, Docker / Ambiente, Estrutura de pastas por serviço, Git, Mensageria, Não fazer, Testes, TypeScript / Node
+Cohesion: 0.20
+Nodes (9): 03 — Convenções e Regras para Agentes, Clean Architecture (obrigatório em código novo/refatorado), Docker / Ambiente, Estrutura de pastas por serviço, Git, Mensageria, Não fazer, Testes (+1 more)
 
 ### Community 26 - "07 — Orquestração de Agentes por Tarefa"
 Cohesion: 0.29
@@ -229,16 +234,16 @@ Cohesion: 0.25
 Nodes (8): container_name, depends_on, image, networks, ports, restart, volumes, api-gateway
 
 ### Community 31 - "context"
-Cohesion: 0.23
-Nodes (12): context, dockerfile, build, build, build, container_name, environment, networks (+4 more)
+Cohesion: 0.36
+Nodes (10): context, dockerfile, build, build, build, build, build, build (+2 more)
 
-### Community 32 - "LoginUseCase.test.ts"
-Cohesion: 0.14
-Nodes (13): Fase 1 — Clean Architecture no user-service, 2. Estratégia de Testes do Monorepo, UserRole, InvalidCredentialsError, ITokenService, TokenPayload, JwtTokenService, CreateUserResponse (+5 more)
+### Community 32 - "payment-service/package.json"
+Cohesion: 0.05
+Nodes (49): dependencies, amqplib@^0.10.5, dotenv@^17.4.2, fastify@^5.10.0, @fastify/cors@^11.3.1, @fastify/helmet@^13.2.0, @fastify/rate-limit@^11.2.1, jsonwebtoken@^9.0.3 (+41 more)
 
-### Community 33 - "user-outbox-processor"
-Cohesion: 0.33
-Nodes (6): user-outbox-processor, build, container_name, environment, networks, restart
+### Community 33 - "compilerOptions"
+Cohesion: 0.13
+Nodes (14): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, isolatedModules, module, moduleResolution, outDir, rootDir (+6 more)
 
 ### Community 34 - "catalog-service"
 Cohesion: 0.29
@@ -253,8 +258,8 @@ Cohesion: 0.29
 Nodes (6): 01 — Visão e Arquitetura, Débitos técnicos conhecidos, Fluxo implementado (Outbox), Infraestrutura (docker-compose), Mapa do repositório, O que é
 
 ### Community 37 - "user-service"
-Cohesion: 0.33
-Nodes (6): user-service, container_name, environment, networks, ports, restart
+Cohesion: 0.29
+Nodes (7): user-service, container_name, depends_on, environment, networks, ports, restart
 
 ### Community 38 - "05 — Plano do Frontend"
 Cohesion: 0.33
@@ -262,7 +267,7 @@ Nodes (6): 05 — Plano do Frontend, Diretriz de Telemetria de Desenvolvimento v
 
 ### Community 39 - "04 — Contratos de API e Eventos"
 Cohesion: 0.29
-Nodes (7): 04 — Contratos de API e Eventos, catalog-service — `http://localhost:3001` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`), Eventos (RabbitMQ — exchange `ecommerce_events`, topic), inventory-service — `http://localhost:3003` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`), order-service — `http://localhost:3004` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`), payment-service 🕓, user-service — `http://localhost:3000` (ou via Gateway `http://localhost:8080`)
+Nodes (7): 04 — Contratos de API e Eventos, catalog-service — `http://localhost:3001` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`), Eventos (RabbitMQ — exchange `ecommerce_events`, topic), inventory-service — `http://localhost:3003` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`), order-service — `http://localhost:3004` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`), payment-service — `http://localhost:3005` (prefixo `/api`, ou via Gateway `http://localhost:8080/api`), user-service — `http://localhost:3000` (ou via Gateway `http://localhost:8080`)
 
 ### Community 40 - "Agente Especialista: Backend & Arquitetura Limpa (`agent-backend`)"
 Cohesion: 0.40
@@ -280,21 +285,21 @@ Nodes (5): scripts, build, dev, start, test
 Cohesion: 0.50
 Nodes (4): Comandos rápidos, Docs — Guia para Agentes de Desenvolvimento, Perfis dos 5 Agentes Especialistas (`docs/agents/`), Regras de manutenção
 
-### Community 46 - "user-service/src/infra/container.ts"
-Cohesion: 0.21
-Nodes (8): createUserUseCase, getUserProfileUseCase, loginUserUseCase, passwordHasher, tokenService, userRepository, authMiddleware(), BcryptPasswordHasher
+### Community 46 - "payment-service"
+Cohesion: 0.33
+Nodes (6): container_name, environment, networks, ports, restart, payment-service
 
 ### Community 47 - "InventoryUseCases.test.ts"
-Cohesion: 0.05
-Nodes (38): Fase 4 — Novos serviços (bancos já provisionados), Tarefa A — Fase 4.1: Microsserviço de Estoque (`inventory-service` + `inventory_db`), InventoryItem, InventoryItemProps, ReservationItemEntry, ReservationStatus, StockReservation, StockReservationProps (+30 more)
+Cohesion: 0.06
+Nodes (35): Tarefa A — Fase 4.1: Microsserviço de Estoque (`inventory-service` + `inventory_db`), InventoryItem, InventoryItemProps, ReservationItemEntry, ReservationStatus, StockReservation, StockReservationProps, DuplicateMessageError (+27 more)
 
 ### Community 48 - "inventory-service/package.json"
 Cohesion: 0.05
 Nodes (49): dependencies, amqplib@^0.10.5, dotenv@^17.4.2, fastify@^5.10.0, @fastify/cors@^11.3.1, @fastify/helmet@^13.2.0, @fastify/rate-limit@^11.2.1, jsonwebtoken@^9.0.3 (+41 more)
 
 ### Community 49 - "B. O que falta (por fase)"
-Cohesion: 0.13
-Nodes (15): 02 — Planejamento e Roadmap, A. O que já foi feito, B. O que falta (por fase), C. Ordem sugerida de execução, catalog-service (MongoDB), D. Definition of Done (qualquer tarefa), Fase 0.5 — Segurança e entrada (ver `06-fluxo-solid-e-seguranca.md`), Fase 0 — Higiene e fundação (fazer primeiro) (+7 more)
+Cohesion: 0.12
+Nodes (16): 02 — Planejamento e Roadmap, A. O que já foi feito, B. O que falta (por fase), C. Ordem sugerida de execução, catalog-service (MongoDB), D. Definition of Done (qualquer tarefa), Fase 0.5 — Segurança e entrada (ver `06-fluxo-solid-e-seguranca.md`), Fase 0 — Higiene e fundação (fazer primeiro) (+8 more)
 
 ### Community 50 - "20260722053928_setup_user_and_outbox_schema/migration.sql"
 Cohesion: 0.67
@@ -306,23 +311,23 @@ Nodes (14): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, 
 
 ### Community 54 - "Order"
 Cohesion: 0.06
-Nodes (39): Tarefa B — Fase 4.2: Microsserviço de Pedidos (`order-service` + `order_db`), Order, OrderItem, OrderItemProps, OrderProps, OrderStatus, InvalidOrderTransitionError, OrderAccessDeniedError (+31 more)
+Nodes (42): Tarefa B — Fase 4.2: Microsserviço de Pedidos (`order-service` + `order_db`), Order, OrderItem, OrderItemProps, OrderProps, OrderStatus, InvalidOrderTransitionError, OrderAccessDeniedError (+34 more)
 
-### Community 55 - "IUserRepository"
-Cohesion: 0.17
-Nodes (8): Estado real da Clean Architecture, Clean Architecture (obrigatório em código novo/refatorado), 2. SOLID aplicado ao projeto, UserAlreadyExistsError, IUserRepository, IPasswordHasher, CreateUserUseCase, FakePasswordHasher
+### Community 55 - "20261028150000_init_payments/migration.sql"
+Cohesion: 0.47
+Nodes (5): "outbox", "payments", payments_orderId_key, payments_userId_idx, "processed_messages"
 
 ### Community 56 - "postgres"
-Cohesion: 0.28
-Nodes (9): postgres, rabbitmq, depends_on, depends_on, depends_on, condition, condition, depends_on (+1 more)
+Cohesion: 0.18
+Nodes (14): postgres, rabbitmq, depends_on, depends_on, depends_on, depends_on, condition, condition (+6 more)
 
 ### Community 59 - "20261028130000_init_inventory/migration.sql"
 Cohesion: 0.38
 Nodes (6): "inventory_items", inventory_items_sku_key, "outbox", "processed_messages", "stock_reservations", stock_reservations_orderId_key
 
 ### Community 60 - "inventory-service"
-Cohesion: 0.29
-Nodes (7): build, container_name, environment, networks, ports, restart, inventory-service
+Cohesion: 0.33
+Nodes (6): container_name, environment, networks, ports, restart, inventory-service
 
 ### Community 61 - "Agente Especialista: Testes Unitários, Automatizados & QA (`agent-qa-tests`)"
 Cohesion: 0.40
@@ -344,23 +349,27 @@ Nodes (6): container_name, environment, networks, ports, restart, order-service
 Cohesion: 0.47
 Nodes (5): "order_items", "orders", orders_userId_idx, "outbox", "processed_messages"
 
+### Community 73 - "notification-service"
+Cohesion: 0.40
+Nodes (5): container_name, environment, networks, restart, notification-service
+
 ## Knowledge Gaps
-- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `bcrypt` connect `bcrypt` to `user-service/package.json`, `IUserRepository`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+- **Why does `mongoose` connect `catalog-service/package.json` to `CreateProductUseCase.test.ts`, `ref_fastify`?**
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `InventoryItem` (e.g. with `Fase 4 — Novos serviços (bancos já provisionados)` and `Tarefa A — Fase 4.1: Microsserviço de Estoque (`inventory-service` + `inventory_db`)`) actually correct?**
   _`InventoryItem` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **Should `User` be split into smaller, more focused modules?**
-  _Cohesion score 0.13911290322580644 - nodes in this community are weakly interconnected._
-- **Why does `mongoose` connect `CreateProductUseCase.test.ts` to `dotenv`, `catalog-service/package.json`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
+  _Cohesion score 0.0502814987381091 - nodes in this community are weakly interconnected._
+- **Why does `IPasswordHasher` connect `User` to `03 — Convenções e Regras para Agentes`?**
+  _High betweenness centrality (0.034) - this node is a cross-community bridge._
 - **Should `CreateProductUseCase.test.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.07023214810461358 - nodes in this community are weakly interconnected._
-- **Why does `IPasswordHasher` connect `IUserRepository` to `LoginUseCase.test.ts`, `.execute`, `FakePasswordHasher`, `user-service/src/infra/container.ts`?**
-  _High betweenness centrality (0.038) - this node is a cross-community bridge._
+  _Cohesion score 0.07136404697380307 - nodes in this community are weakly interconnected._
+- **Why does `bcrypt` connect `bcrypt` to `User`, `user-service/package.json`?**
+  _High betweenness centrality (0.033) - this node is a cross-community bridge._
 - **Should `CatalogPage.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.1050228310502283 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08732309545317675 - nodes in this community are weakly interconnected._

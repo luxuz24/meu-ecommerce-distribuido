@@ -90,6 +90,21 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface PaymentRecord {
+  id: string;
+  orderId: string;
+  userId: string;
+  amount: number;
+  status: 'APPROVED' | 'FAILED';
+  failureReason?: string | null;
+  createdAt: string;
+}
+
+export interface ProcessPaymentResponse {
+  event: 'PAYMENT_APPROVED' | 'PAYMENT_FAILED' | 'ALREADY_PROCESSED';
+  payment: PaymentRecord;
+}
+
 export interface ApiTelemetryRecord {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   endpoint: string;

@@ -159,6 +159,28 @@ services:
       rabbitmq:
         condition: service_started
 
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    restart: unless-stopped
+    ports:
+      - "${PAYMENT_PORT:-3005}:${PAYMENT_PORT:-3005}"
+    environment:
+      - PORT=${PAYMENT_PORT:-3005}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db?schema=public
+      - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+    networks:
+      - ecom_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
   api-gateway:
     image: nginx:1.27-alpine
     container_name: ecom_api_gateway
@@ -174,6 +196,7 @@ services:
       - catalog-service
       - inventory-service
       - order-service
+      - payment-service
 
   frontend:
     build:
