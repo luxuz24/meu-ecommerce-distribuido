@@ -300,12 +300,9 @@ export const orderApi = {
     payload: {
       items: Array<{
         productId: string;
-        sku: string;
-        name: string;
-        price: number;
         quantity: number;
       }>;
-      simulateOutcome?: 'APPROVED' | 'FAILED';
+      simulatePaymentFailure?: boolean;
     },
     token?: string | null
   ) =>

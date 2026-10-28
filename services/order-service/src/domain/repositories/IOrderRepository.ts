@@ -12,7 +12,7 @@ export interface CreateOrderData {
   userId: string;
   items: CreateOrderItemData[];
   total: number;
-  simulateOutcome?: 'APPROVED' | 'FAILED';
+  simulateOutcome?: 'FAILED';
 }
 
 export interface UpdateOrderStatusData {

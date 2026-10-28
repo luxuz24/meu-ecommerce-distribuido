@@ -9,15 +9,33 @@ import {
 import { CreateOrderUseCase } from './CreateOrderUseCase.js';
 import { GetOrderByIdUseCase, ListUserOrdersUseCase } from './GetOrderUseCases.js';
 import { UpdateOrderStatusUseCase } from './UpdateOrderStatusUseCase.js';
+import { ProductUnavailableError } from '../domain/errors/OrderErrors.js';
+import { type CatalogProduct, type IProductCatalog } from '../domain/services/IProductCatalog.js';
 import { verifyOrderJwt } from '../infra/http/middlewares/AuthMiddleware.js';
 import jwt from 'jsonwebtoken';
+
+class FakeProductCatalog implements IProductCatalog {
+  private readonly products = new Map<string, CatalogProduct>([
+    ['p1', { id: 'p1', sku: 'tec-mec-pro-001', name: 'Teclado Mecânico Wireless Pro', price: 549.9, isActive: true }],
+    ['p2', { id: 'p2', sku: 'mou-erg-opt-002', name: 'Mouse Ergonômico', price: 289.0, isActive: true }],
+    ['p3', { id: 'p3', sku: 'MON-4K-DEV-003', name: 'Monitor 4K', price: 3199, isActive: true }],
+    ['p-off', { id: 'p-off', sku: 'OLD-001', name: 'Produto Descontinuado', price: 10, isActive: false }],
+  ]);
+
+  async findById(productId: string): Promise<CatalogProduct | null> {
+    return this.products.get(productId) ?? null;
+  }
+}
 
 class InMemoryOrderRepository implements IOrderRepository {
   private orders = new Map<string, Order>();
   private processedMessages = new Set<string>();
   public outboxEvents: Array<{ eventType: string; payload: unknown }> = [];
 
+  public lastCreateData: CreateOrderData | undefined;
+
   async createWithOutbox(data: CreateOrderData): Promise<Order> {
+    this.lastCreateData = data;
     const id = `ord_${this.orders.size + 1}`;
     const order = new Order({
       id,
@@ -101,7 +119,7 @@ describe('Order Service Use Cases & Saga State Machine', () => {
 
   beforeEach(() => {
     repo = new InMemoryOrderRepository();
-    createOrderUseCase = new CreateOrderUseCase(repo);
+    createOrderUseCase = new CreateOrderUseCase(repo, new FakeProductCatalog());
     listUserOrdersUseCase = new ListUserOrdersUseCase(repo);
     getOrderByIdUseCase = new GetOrderByIdUseCase(repo);
     updateOrderStatusUseCase = new UpdateOrderStatusUseCase(repo);
@@ -111,20 +129,8 @@ describe('Order Service Use Cases & Saga State Machine', () => {
     const order = await createOrderUseCase.execute({
       userId: 'user-123',
       items: [
-        {
-          productId: 'p1',
-          sku: 'tec-mec-pro-001',
-          name: 'Teclado Mecânico Wireless Pro',
-          price: 549.9,
-          quantity: 2,
-        },
-        {
-          productId: 'p2',
-          sku: 'mou-erg-opt-002',
-          name: 'Mouse Ergonômico',
-          price: 289.0,
-          quantity: 1,
-        },
+        { productId: 'p1', quantity: 2 },
+        { productId: 'p2', quantity: 1 },
       ],
     });
 
@@ -135,17 +141,74 @@ describe('Order Service Use Cases & Saga State Machine', () => {
     expect(repo.outboxEvents[0]?.eventType).toBe('ORDER_CREATED');
   });
 
+  it('should ignore client-supplied prices and use catalog prices (anti price tampering)', async () => {
+    const tampered = {
+      userId: 'attacker',
+      items: [{ productId: 'p3', quantity: 1, price: 0.01, name: 'Hacked', sku: 'FAKE' }],
+    } as unknown as Parameters<CreateOrderUseCase['execute']>[0];
+
+    const order = await createOrderUseCase.execute(tampered);
+
+    expect(order.total).toBe(3199);
+    expect(order.items[0]?.price).toBe(3199);
+    expect(order.items[0]?.sku).toBe('MON-4K-DEV-003');
+    expect(order.items[0]?.name).toBe('Monitor 4K');
+  });
+
+  it('should merge repeated lines of the same product into a single item', async () => {
+    const order = await createOrderUseCase.execute({
+      userId: 'user-123',
+      items: [
+        { productId: 'p2', quantity: 1 },
+        { productId: 'p2', quantity: 2 },
+      ],
+    });
+
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0]?.quantity).toBe(3);
+    expect(order.total).toBe(867);
+  });
+
+  it('should reject unknown or inactive products', async () => {
+    await expect(
+      createOrderUseCase.execute({ userId: 'u', items: [{ productId: 'ghost', quantity: 1 }] })
+    ).rejects.toBeInstanceOf(ProductUnavailableError);
+    await expect(
+      createOrderUseCase.execute({ userId: 'u', items: [{ productId: 'p-off', quantity: 1 }] })
+    ).rejects.toBeInstanceOf(ProductUnavailableError);
+  });
+
+  it('should only forward a FAILED outcome when payment failure is simulated', async () => {
+    await createOrderUseCase.execute({ userId: 'u', items: [{ productId: 'p1', quantity: 1 }] });
+    expect(repo.lastCreateData?.simulateOutcome).toBeUndefined();
+
+    await createOrderUseCase.execute({
+      userId: 'u',
+      items: [{ productId: 'p1', quantity: 1 }],
+      simulatePaymentFailure: true,
+    });
+    expect(repo.lastCreateData?.simulateOutcome).toBe('FAILED');
+  });
+
+  it('should never move a CANCELLED order to PAID', async () => {
+    const created = await createOrderUseCase.execute({
+      userId: 'u',
+      items: [{ productId: 'p1', quantity: 1 }],
+    });
+    await updateOrderStatusUseCase.execute({ orderId: created.id, eventType: 'STOCK_REJECTED' });
+    const afterLatePayment = await updateOrderStatusUseCase.execute({
+      orderId: created.id,
+      eventType: 'PAYMENT_APPROVED',
+    });
+
+    expect(afterLatePayment?.status).toBe('CANCELLED');
+  });
+
   it('should transition PENDING -> STOCK_RESERVED -> PAID and emit ORDER_CONFIRMED', async () => {
     const created = await createOrderUseCase.execute({
       userId: 'user-123',
       items: [
-        {
-          productId: 'p1',
-          sku: 'HUB-TB4-PRO-004',
-          name: 'Dock Station TB4',
-          price: 899,
-          quantity: 1,
-        },
+        { productId: 'p1', quantity: 1 },
       ],
     });
 
@@ -169,13 +232,7 @@ describe('Order Service Use Cases & Saga State Machine', () => {
     const created = await createOrderUseCase.execute({
       userId: 'user-123',
       items: [
-        {
-          productId: 'p3',
-          sku: 'MON-4K-DEV-003',
-          name: 'Monitor 4K',
-          price: 3199,
-          quantity: 2,
-        },
+        { productId: 'p3', quantity: 2 },
       ],
     });
 
@@ -195,13 +252,7 @@ describe('Order Service Use Cases & Saga State Machine', () => {
     const created = await createOrderUseCase.execute({
       userId: 'owner-user',
       items: [
-        {
-          productId: 'p1',
-          sku: 'SKU-01',
-          name: 'Item 1',
-          price: 100,
-          quantity: 1,
-        },
+        { productId: 'p1', quantity: 1 },
       ],
     });
 

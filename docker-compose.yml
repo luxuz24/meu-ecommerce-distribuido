@@ -149,6 +149,7 @@ services:
       - PORT=${ORDER_PORT:-3004}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/order_db?schema=public
       - RABBITMQ_URL=amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672
+      - CATALOG_SERVICE_URL=http://catalog-service:${CATALOG_PORT:-3001}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
     networks:

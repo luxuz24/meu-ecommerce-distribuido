@@ -9,14 +9,8 @@ export async function registerOrderRoutes(
 ): Promise<void> {
   app.post<{
     Body: {
-      items: Array<{
-        productId: string;
-        sku: string;
-        name: string;
-        price: number;
-        quantity: number;
-      }>;
-      simulateOutcome?: 'APPROVED' | 'FAILED';
+      items: Array<{ productId: string; quantity: number }>;
+      simulatePaymentFailure?: boolean;
     };
   }>(
     '/orders',
@@ -28,23 +22,17 @@ export async function registerOrderRoutes(
           required: ['items'],
           additionalProperties: false,
           properties: {
-            simulateOutcome: {
-              type: 'string',
-              enum: ['APPROVED', 'FAILED'],
-            },
+            simulatePaymentFailure: { type: 'boolean' },
             items: {
               type: 'array',
               minItems: 1,
               maxItems: 50,
               items: {
                 type: 'object',
-                required: ['productId', 'sku', 'name', 'price', 'quantity'],
+                required: ['productId', 'quantity'],
                 additionalProperties: false,
                 properties: {
                   productId: { type: 'string', minLength: 1, maxLength: 120 },
-                  sku: { type: 'string', minLength: 2, maxLength: 64 },
-                  name: { type: 'string', minLength: 1, maxLength: 200 },
-                  price: { type: 'number', minimum: 0, maximum: 1000000 },
                   quantity: { type: 'integer', minimum: 1, maximum: 1000 },
                 },
               },

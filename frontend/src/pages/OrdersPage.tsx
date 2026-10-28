@@ -88,12 +88,10 @@ export const OrdersPage: React.FC = () => {
     try {
       const res = await orderApi.createOrder(
         {
-          simulateOutcome: simulateFailure ? 'FAILED' : 'APPROVED',
+          ...(simulateFailure ? { simulatePaymentFailure: true } : {}),
+          // Preço, nome e SKU são resolvidos pelo order-service no catálogo
           items: items.map((i) => ({
             productId: i.product.id,
-            sku: i.product.sku,
-            name: i.product.name,
-            price: i.product.price,
             quantity: i.quantity,
           })),
         },

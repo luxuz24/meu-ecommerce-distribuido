@@ -1,5 +1,10 @@
 import { type FastifyReply, type FastifyRequest } from 'fastify';
-import { OrderAccessDeniedError, OrderNotFoundError } from '../../../domain/errors/OrderErrors.js';
+import {
+  CatalogUnavailableError,
+  OrderAccessDeniedError,
+  OrderNotFoundError,
+  ProductUnavailableError,
+} from '../../../domain/errors/OrderErrors.js';
 import { type CreateOrderUseCase } from '../../../use-cases/CreateOrderUseCase.js';
 import {
   type GetOrderByIdUseCase,
@@ -21,14 +26,8 @@ export class OrderController {
   async create(
     request: FastifyRequest<{
       Body: {
-        items: Array<{
-          productId: string;
-          sku: string;
-          name: string;
-          price: number;
-          quantity: number;
-        }>;
-        simulateOutcome?: 'APPROVED' | 'FAILED';
+        items: Array<{ productId: string; quantity: number }>;
+        simulatePaymentFailure?: boolean;
       };
     }>,
     reply: FastifyReply
@@ -38,13 +37,24 @@ export class OrderController {
       return;
     }
 
-    const order = await this.createOrderUseCase.execute({
-      userId: request.authUser.userId,
-      items: request.body.items,
-      ...(request.body.simulateOutcome ? { simulateOutcome: request.body.simulateOutcome } : {}),
-    });
-
-    reply.status(201).send(order);
+    try {
+      const order = await this.createOrderUseCase.execute({
+        userId: request.authUser.userId,
+        items: request.body.items,
+        ...(request.body.simulatePaymentFailure ? { simulatePaymentFailure: true } : {}),
+      });
+      reply.status(201).send(order);
+    } catch (err) {
+      if (err instanceof ProductUnavailableError) {
+        reply.status(422).send({ error: err.message });
+        return;
+      }
+      if (err instanceof CatalogUnavailableError) {
+        reply.status(503).send({ error: err.message });
+        return;
+      }
+      throw err;
+    }
   }
 
   async listMyOrders(request: FastifyRequest, reply: FastifyReply): Promise<void> {
