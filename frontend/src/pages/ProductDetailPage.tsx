@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   DevOnly,
   EndpointBar,
   JsonInspectorDrawer,
 } from '../components/telemetry/DevTelemetry';
+import { useCart } from '../context/CartContext';
 import type { ApiTelemetryRecord, Product } from '../domain/types';
 import { ApiError, catalogApi } from '../services/api';
 import { formatBRL } from './CatalogPage';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { addItem } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [telemetry, setTelemetry] = useState<ApiTelemetryRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,8 +319,12 @@ export const ProductDetailPage: React.FC = () => {
                   type="button"
                   disabled={product.stock === 0 || !product.isActive}
                   onClick={() => {
+                    addItem(product, qty);
                     setBoughtFeedback(true);
-                    setTimeout(() => setBoughtFeedback(false), 2000);
+                    setTimeout(() => {
+                      setBoughtFeedback(false);
+                      navigate('/orders');
+                    }, 900);
                   }}
                   className="w-full bg-primary-container hover:bg-primary disabled:opacity-40 text-on-primary py-3 rounded-lg font-label-lg text-label-lg font-medium flex items-center justify-center gap-2 shadow-sm transition-all"
                 >

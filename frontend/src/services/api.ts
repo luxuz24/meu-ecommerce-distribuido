@@ -3,6 +3,7 @@ import type {
   CreateProductInput,
   InventoryItemRecord,
   LoginResponse,
+  Order,
   PaginatedProducts,
   Product,
   ReserveStockResponse,
@@ -16,6 +17,8 @@ export const CATALOG_API_URL =
   import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3001';
 export const INVENTORY_API_URL =
   import.meta.env.VITE_INVENTORY_API_URL || 'http://localhost:3003';
+export const ORDER_API_URL =
+  import.meta.env.VITE_ORDER_API_URL || 'http://localhost:3004';
 
 export class ApiError extends Error {
   public readonly statusCode: number;
@@ -277,5 +280,99 @@ export const inventoryApi = {
       'POST',
       '/api/inventory/reserve',
       { body: payload }
+    ),
+};
+
+export const orderApi = {
+  checkHealth: () =>
+    requestWithTelemetry<{ status: string; service: string }>(
+      'order-service:3004',
+      ORDER_API_URL,
+      'GET',
+      '/health'
+    ),
+
+  createOrder: (
+    payload: {
+      items: Array<{
+        productId: string;
+        sku: string;
+        name: string;
+        price: number;
+        quantity: number;
+      }>;
+    },
+    token?: string | null
+  ) =>
+    requestWithTelemetry<Order>(
+      'order-service:3004',
+      ORDER_API_URL,
+      'POST',
+      '/api/orders',
+      {
+        body: payload,
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
+    ),
+
+  listMyOrders: (token?: string | null) =>
+    requestWithTelemetry<{ items: Order[]; total: number }>(
+      'order-service:3004',
+      ORDER_API_URL,
+      'GET',
+      '/api/orders',
+      {
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
+    ),
+
+  getOrderById: (id: string, token?: string | null) =>
+    requestWithTelemetry<Order>(
+      'order-service:3004',
+      ORDER_API_URL,
+      'GET',
+      `/api/orders/${id}`,
+      {
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
+    ),
+
+  triggerSagaEvent: (
+    id: string,
+    payload: {
+      eventType:
+        | 'STOCK_RESERVED'
+        | 'STOCK_REJECTED'
+        | 'PAYMENT_APPROVED'
+        | 'PAYMENT_FAILED';
+      reason?: string;
+    },
+    token?: string | null
+  ) =>
+    requestWithTelemetry<Order>(
+      'order-service:3004',
+      ORDER_API_URL,
+      'PATCH',
+      `/api/orders/${id}/saga-event`,
+      {
+        body: payload,
+        token:
+          token ??
+          (typeof localStorage !== 'undefined'
+            ? localStorage.getItem('microstore_jwt_token')
+            : null),
+      }
     ),
 };

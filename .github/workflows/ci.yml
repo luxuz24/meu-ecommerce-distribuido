@@ -17,6 +17,7 @@ jobs:
           - user-service
           - catalog-service
           - inventory-service
+          - order-service
           - user-outbox-processor
           - notification-service
 
@@ -36,7 +37,7 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma Client
-        if: matrix.service == 'user-service' || matrix.service == 'inventory-service'
+        if: matrix.service == 'user-service' || matrix.service == 'inventory-service' || matrix.service == 'order-service'
         working-directory: services/${{ matrix.service }}
         run: npx prisma generate
 
@@ -87,6 +88,7 @@ jobs:
           cp services/user-service/.env.example services/user-service/.env
           cp services/catalog-service/.env.example services/catalog-service/.env
           cp services/inventory-service/.env.example services/inventory-service/.env
+          cp services/order-service/.env.example services/order-service/.env
           cp services/user-outbox-processor/.env.example services/user-outbox-processor/.env
           cp services/notification-service/.env.example services/notification-service/.env
           cp frontend/.env.example frontend/.env

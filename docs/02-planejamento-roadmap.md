@@ -67,14 +67,14 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ pendente
 
 ### Fase 4 — Novos serviços (bancos já provisionados)
 - ✅ **inventory-service** (`inventory_db`): estoque/reservas em Clean Architecture (`InventoryItem`, `StockReservation`, `Outbox`, `ProcessedMessage` para idempotência); consome `ORDER_CREATED` e `PAYMENT_FAILED`, emite `STOCK_RESERVED`/`STOCK_REJECTED`
-- ⬜ **order-service** (`order_db`): carrinho/pedidos, outbox, saga de criação de pedido
+- ✅ **order-service** (`order_db`): pedidos em Clean Architecture (`Order`, `OrderItem`, `Outbox`, `ProcessedMessage`), cálculo de total no servidor, proteção anti-IDOR, Saga (`PENDING` → `STOCK_RESERVED` → `PAID` / `CANCELLED`) e tela `/orders` + Carrinho no Frontend
 - ⬜ **payment-service** (`payment_db`): pagamento simulado; consome `STOCK_RESERVED`, emite `PAYMENT_APPROVED/FAILED`
 - 🟡 Saga coreografada: Order → Inventory → Payment → Order (confirmação/compensação)
 - ⬜ Estender notification-service: pedido confirmado, pagamento falhou
 - 🟡 Cada serviço: Dockerfile, entrada no compose, `.env.example`, migrations, testes
 
 ### Fase 5 — Resiliência e observabilidade
-- 🟡 Idempotência nos consumidores (tabela `processed_messages` / `messageId` implementada no `inventory-service`)
+- ✅ Idempotência nos consumidores (tabela `processed_messages` / `messageId` implementada no `inventory-service` e `order-service`)
 - ⬜ Retry + DLQ no RabbitMQ; `nack` correto no notification-service
 - ⬜ Outbox genérico reutilizável (processor parametrizado por serviço/DB)
 - ⬜ Logs estruturados, correlation-id, `/health` com checagem de dependências
