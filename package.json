@@ -23,9 +23,10 @@
     "build:notification": "npm --prefix services/notification-service run build",
     "build:frontend": "npm --prefix frontend run build",
     "build": "npm run build:user && npm run build:catalog && npm run build:inventory && npm run build:order && npm run build:payment && npm run build:outbox && npm run build:notification && npm run build:frontend",
-    "seed:demo": "npx tsx scripts/seed-demo.ts",
+    "seed:demo": "npx --yes tsx scripts/seed-demo.ts",
     "graph:update": "PATH=\"$HOME/.local/bin:$PATH\" graphify update . --force && PATH=\"$HOME/.local/bin:$PATH\" graphify export obsidian --dir docs/obsidian && PATH=\"$HOME/.local/bin:$PATH\" graphify export html",
     "graph:explain": "PATH=\"$HOME/.local/bin:$PATH\" graphify explain",
-    "graph:path": "PATH=\"$HOME/.local/bin:$PATH\" graphify path"
+    "graph:path": "PATH=\"$HOME/.local/bin:$PATH\" graphify path",
+    "test:e2e": "npx --yes tsx scripts/e2e-saga.ts"
   }
 }

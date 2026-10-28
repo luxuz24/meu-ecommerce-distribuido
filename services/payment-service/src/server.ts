@@ -12,6 +12,9 @@ import { startPaymentMessaging } from './infra/messaging/PaymentEventWorker.js';
 const app = Fastify({
   logger: true,
   requestIdHeader: 'x-correlation-id',
+  // Atrás do API Gateway: o IP real do cliente vem no X-Forwarded-For. Sem isso o rate
+  // limit por IP enxergaria só o Nginx e viraria um limite global para todos os usuários.
+  trustProxy: 'loopback, uniquelocal',
 });
 
 const start = async () => {
