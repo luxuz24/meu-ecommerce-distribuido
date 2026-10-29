@@ -1,34 +1,50 @@
-# MicroStore — Estudo de caso de microsserviços orientados a eventos 🛒⚡
+# MicroStore — an event-driven microservices case study
+
+**English** | [Português](./README.pt-BR.md)
 
 [![CI](https://github.com/luxuz24/meu-ecommerce-distribuido/actions/workflows/ci.yml/badge.svg)](https://github.com/luxuz24/meu-ecommerce-distribuido/actions/workflows/ci.yml)
-![Node 24](https://img.shields.io/badge/node-24-339933)
-![TypeScript](https://img.shields.io/badge/TypeScript-ESM-3178C6)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-Um e-commerce dividido em **5 microsserviços com banco próprio**, que fecham uma compra por uma
-**Saga coreografada** sobre RabbitMQ, sem chamadas HTTP em cadeia e sem transação distribuída.
+![Node.js](https://img.shields.io/badge/Node.js_24-5FA04E?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Fastify](https://img.shields.io/badge/Fastify-000000?logo=fastify&logoColor=white)
+![React](https://img.shields.io/badge/React_19-20232A?logo=react&logoColor=61DAFB)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
+![Nginx](https://img.shields.io/badge/Nginx-009639?logo=nginx&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?logo=docker&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-6E9F18?logo=vitest&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
 
-O objetivo é mostrar, rodando e testado, como resolver os problemas que aparecem quando um
-monólito vira um sistema distribuído:
+An e-commerce platform split into **five microservices, each with its own database**, that
+completes a purchase through a **choreographed Saga** over RabbitMQ — no chained HTTP calls
+and no distributed transactions.
 
-- como gravar no banco **e** publicar um evento sem perder nenhum dos dois;
-- como lidar com mensagens duplicadas;
-- como desfazer uma reserva quando o pagamento falha;
-- como impedir que dois pedidos simultâneos vendam a mesma unidade;
-- como seguir uma única compra através de quatro serviços.
+The goal is to show, running and tested, how to solve the problems that appear when a
+monolith becomes a distributed system:
 
-Cada uma dessas garantias tem um teste ponta a ponta que roda no CI contra a stack real.
+- writing to the database **and** publishing an event without losing either;
+- handling duplicate messages;
+- undoing a reservation when payment fails, or when a step never answers;
+- preventing two simultaneous orders from selling the same unit;
+- following a single purchase across four services.
+
+Each of these guarantees is covered by an end-to-end or chaos test that runs in CI
+against the real stack. The defects found along the way are documented in
+[Engineering notes](./docs/engineering-notes.md).
 
 ---
 
-## 🏛️ Arquitetura
+## Architecture
 
 ```mermaid
 flowchart LR
     B[Browser] --> F[Frontend :3002]
-    B -->|toda a API| G[Nginx API Gateway :8080]
+    B -->|all API traffic| G[Nginx API Gateway :8080]
     G --> U[user-service] & C[catalog-service] & I[inventory-service] & O[order-service] & P[payment-service]
-    O -->|preço/SKU| C
+    O -->|price / SKU| C
     U --- UDB[(user_db)]
     C --- CDB[(catalog_db · Mongo)]
     I --- IDB[(inventory_db)]
@@ -39,83 +55,90 @@ flowchart LR
     R --> N[notification-service]
 ```
 
-| Serviço | Banco | Responsabilidade | Papel na Saga |
+| Service | Database | Responsibility | Role in the Saga |
 |---|---|---|---|
-| **user-service** | Postgres `user_db` | Cadastro, login JWT (HS256), RBAC `CUSTOMER`/`ADMIN` | — |
-| **catalog-service** | MongoDB `catalog_db` | Vitrine, busca textual, CRUD admin | Fonte de verdade do preço |
-| **order-service** | Postgres `order_db` | Ciclo de vida do pedido `PENDING → STOCK_RESERVED → PAID / CANCELLED` | Inicia a Saga e aplica o desfecho |
-| **inventory-service** | Postgres `inventory_db` | Reserva atômica, estorno e baixa definitiva | Participante + compensação |
-| **payment-service** | Postgres `payment_db` | Cobrança simulada com regra antifraude | Participante |
-| **notification-service** | — | Consome eventos e simula e-mails | Observador |
+| **user-service** | PostgreSQL `user_db` | Sign-up, JWT login (HS256), RBAC `CUSTOMER` / `ADMIN` | — |
+| **catalog-service** | MongoDB `catalog_db` | Storefront, text search, admin CRUD | Source of truth for prices |
+| **order-service** | PostgreSQL `order_db` | Order lifecycle `PENDING → STOCK_RESERVED → PAID / CANCELLED` | Starts the Saga and applies its outcome |
+| **inventory-service** | PostgreSQL `inventory_db` | Atomic reservation, release, final deduction, expiry | Participant + compensation |
+| **payment-service** | PostgreSQL `payment_db` | Simulated charge with an anti-fraud rule | Participant |
+| **notification-service** | — | Consumes events and simulates e-mails | Observer |
 
-Somente o **gateway (`:8080`)** e o **frontend (`:3002`)** são expostos no host. Os serviços só
-são alcançáveis pela rede interna, então rate limit, roteamento e rastreabilidade não podem ser
-contornados.
+Only the **gateway (`:8080`)** and the **frontend (`:3002`)** are published on the host.
+Services are reachable exclusively through the internal network, so rate limiting, routing
+and tracing cannot be bypassed.
 
-## ⚡ A Saga de checkout
+## The checkout Saga
 
-1. **`order-service`** recebe `{productId, quantity}`, busca preço, nome e SKU no catálogo,
-   grava o pedido `PENDING` e o evento `ORDER_CREATED` na **outbox**, na mesma transação.
-2. **`inventory-service`** reserva o estoque com um `UPDATE` condicional e publica
-   `STOCK_RESERVED`. Se faltar saldo, publica `STOCK_REJECTED` e o pedido é cancelado sem cobrança.
-3. **`payment-service`** cobra o total calculado pelo servidor e publica `PAYMENT_APPROVED` ou
-   `PAYMENT_FAILED`.
-4. **Desfecho:**
-   - **aprovado:** o pedido vira `PAID` e a reserva vira baixa definitiva (`ORDER_CONFIRMED`);
-   - **recusado:** o pedido vira `CANCELLED` e o inventory **estorna a reserva** (compensação).
+1. **`order-service`** receives `{productId, quantity}`, fetches price, name and SKU from the
+   catalog, and stores the `PENDING` order and the `ORDER_CREATED` event in the **outbox**,
+   in the same transaction.
+2. **`inventory-service`** reserves stock with a conditional `UPDATE` and publishes
+   `STOCK_RESERVED`. If stock is short it publishes `STOCK_REJECTED` and the order is
+   cancelled with no charge.
+3. **`payment-service`** charges the server-calculated total and publishes
+   `PAYMENT_APPROVED` or `PAYMENT_FAILED`.
+4. **Outcome:**
+   - **approved:** the order becomes `PAID` and the reservation becomes a final deduction
+     (`ORDER_CONFIRMED`);
+   - **declined:** the order becomes `CANCELLED` and inventory **releases the reservation**
+     (compensation);
+   - **no answer:** the reservation **expires** after `RESERVATION_TTL_SECONDS`, the stock
+     returns and the order is cancelled.
 
-O diagrama de sequência completo está em [docs/01-visao-e-arquitetura.md](./docs/01-visao-e-arquitetura.md#a-saga-de-checkout).
+The full sequence diagram is in [docs/01](./docs/01-visao-e-arquitetura.md#a-saga-de-checkout).
 
-## 🛡️ Garantias e como são obtidas
+## Guarantees and how they are achieved
 
-| Problema | Solução | Prova |
+| Problem | Solution | Proof |
 |---|---|---|
-| Gravar e publicar de forma atômica | **Transactional Outbox**, com relay que só marca `published` após o *publisher confirm* do broker | Teste de caos abaixo |
-| Mensagens duplicadas (*at-least-once*) | Tabela `processed_messages` + transições de estado condicionais | Unitários + E2E |
-| Dois pedidos disputando o mesmo item | `UPDATE … WHERE availableQty >= qty` + `CHECK (availableQty >= 0)` no banco | E2E: 12 pedidos simultâneos por 4 unidades → exatamente 4 pagos |
-| Falha no meio da Saga | Compensação: `payment_failed` estorna a reserva | E2E |
-| Cliente adulterando o preço | Preço resolvido no catalog-service; o que vem do cliente é descartado | Unitário + E2E |
-| Broker fora do ar | Reconexão com backoff (1s → 30s) e topologia redeclarada; health `503` enquanto degradado | Teste de caos abaixo |
-| Mensagem envenenada | Dead Letter Exchange + uma `*_dlq` por fila | — |
-| Seguir uma compra entre serviços | `X-Correlation-ID`: gateway → outbox → propriedade AMQP → `AsyncLocalStorage` | E2E + `grep` nos logs |
-| Escalada de privilégio | Cadastro público sempre cria `CUSTOMER`; o ADMIN é provisionado pelo servidor | E2E |
+| Write and publish atomically | **Transactional Outbox**; the relay marks `published` only after the broker's *publisher confirm* | Chaos test (broker stopped mid-flow) |
+| Duplicate messages (*at-least-once*) | `processed_messages` table + conditional state transitions | Unit + E2E |
+| Two orders competing for the same item | `UPDATE … WHERE available_qty >= qty` + `CHECK (available_qty >= 0)` | E2E: 12 simultaneous orders for 4 units → exactly 4 paid |
+| Failure in the middle of the Saga | Compensation: `payment_failed` releases the reservation | E2E |
+| A step that never answers | Reservation expiry with a conditional sweeper | Chaos test in CI |
+| Client tampering with prices | Prices resolved in `catalog-service`; client values are discarded | Unit + E2E |
+| Broker outage | Reconnection with backoff (1 s → 30 s), topology re-declared, `/health` returns `503` while degraded | Chaos test |
+| Poison messages | Dead-letter exchange + one `*_dlq` per queue | — |
+| Tracing one purchase across services | `X-Correlation-ID`: gateway → outbox → AMQP property → `AsyncLocalStorage` | E2E + log `grep` |
+| Privilege escalation | Public sign-up always creates `CUSTOMER`; admin is provisioned by the server | E2E |
 
-Os trade-offs de cada decisão (coreografia × orquestração, outbox por polling × CDC etc.) e as
-limitações conhecidas estão em [docs/01](./docs/01-visao-e-arquitetura.md#decisões-arquiteturais-adrs-resumidos).
+Trade-offs (choreography vs. orchestration, polling outbox vs. CDC, and others) and known
+limitations are in [docs/01](./docs/01-visao-e-arquitetura.md#decisões-arquiteturais-adrs-resumidos).
 
 ---
 
-## 🚀 Rodando localmente
+## Running locally
 
-Pré-requisitos: **Docker** com Compose v2 e **Node.js 24+** (para os scripts de seed e E2E).
+Requirements: **Docker** with Compose v2 and **Node.js 24+** (for the seed and test scripts).
 
 ```bash
 git clone https://github.com/luxuz24/meu-ecommerce-distribuido.git
 cd meu-ecommerce-distribuido
 cp .env.example .env
 
-docker compose up -d --build --wait   # sobe 12 containers e espera todos os healthchecks
-npm run seed:demo                     # admin, cliente e 5 produtos com estoque
+docker compose up -d --build --wait   # starts 12 containers and waits for every healthcheck
+npm run seed:demo                     # admin, customer and 5 products with stock
 ```
 
-| | URL | Credenciais |
+| | URL | Credentials |
 |---|---|---|
-| Loja | http://localhost:3002 | `cliente@microstore.com` / `ClientePassword123!` |
-| Painel admin | http://localhost:3002/admin/products | `admin@microstore.com` / `AdminPassword123!` |
-| Arquitetura interativa | http://localhost:3002/architecture | — |
+| Store | http://localhost:3002 | `cliente@microstore.com` / `ClientePassword123!` |
+| Admin panel | http://localhost:3002/admin/products | `admin@microstore.com` / `AdminPassword123!` |
+| Interactive architecture page | http://localhost:3002/architecture | — |
 | API Gateway | http://localhost:8080 | — |
 | RabbitMQ Management | http://localhost:15672 | `guest` / `guest` |
 
-## 🔬 Roteiro de demonstração
+## Demo script
 
-**1. Compra feliz.** Na loja, adicione um produto ao carrinho e finalize. O pedido nasce
-`PENDING` e a tela acompanha sozinha até `PAID`, em cerca de 3s.
+**1. Happy path.** Add a product to the cart and check out. The order starts as `PENDING`
+and the page follows it on its own until `PAID`, in about 3 seconds.
 
-**2. Compensação.** Finalize outra compra marcando **"Simular Falha de Pagamento"**. O pedido
-termina `CANCELLED` e o estoque volta ao valor original.
+**2. Compensation.** Check out again with **"Simular Falha de Pagamento"** (simulate payment
+failure) ticked. The order ends `CANCELLED` and stock returns to its original value.
 
-**3. Rastreabilidade.** Cada resposta traz um `X-Correlation-ID`, que aparece no inspetor de
-telemetria do modo Dev. Com ele você vê a compra atravessar os serviços:
+**3. Tracing.** Every response carries an `X-Correlation-ID`, shown in the Dev-mode
+telemetry inspector. Use it to follow the purchase across services:
 
 ```bash
 docker compose logs -t | grep <correlation-id>
@@ -126,62 +149,79 @@ order-service         POST /api/orders
 inventory-service     [inventory-service] cid=… <- order_created
 payment-service       [payment-service]   cid=… <- stock_reserved
 order-service         [order-service]     cid=… <- payment_failed
-inventory-service     [inventory-service] cid=… <- payment_failed   ← estorno
+inventory-service     [inventory-service] cid=… <- payment_failed   (release)
 notification-service  Correlation: cid=…
 ```
 
-**4. Caos: derrube o broker no meio do fluxo.**
+**4. Chaos: stop the broker mid-flow.**
 
 ```bash
 docker stop ecom_rabbitmq
 ```
 
-Faça uma compra: ela é aceita (`201 PENDING`) e o evento fica guardado na outbox. O endpoint
-`/health/order` responde `503` com `"messaging":"disconnected"`.
+Place an order: it is accepted (`201 PENDING`) and the event waits in the outbox.
+`/health/order` answers `503` with `"messaging":"disconnected"`.
 
 ```bash
 docker start ecom_rabbitmq
 ```
 
-Em poucos segundos os 5 serviços reconectam sozinhos e o pedido criado durante a queda conclui
-como `PAID`, sem perder nenhum evento.
+Within seconds all five services reconnect on their own and the order placed during the
+outage completes as `PAID`, without losing any event.
+
+**5. Chaos: a step that never answers.**
+
+```bash
+RESERVATION_TTL_SECONDS=15 RESERVATION_SWEEP_INTERVAL_MS=2000 docker compose up -d --wait inventory-service
+npm run test:chaos
+```
+
+The script makes `payment-service`'s database fail so the payment message is
+dead-lettered. The reservation expires, stock returns and the order ends
+`CANCELLED (RESERVATION_EXPIRED)`.
 
 ---
 
-## 🧪 Testes
+## Quality gates
 
 ```bash
-npm test           # 54 testes unitários (Vitest, fakes in-memory) em todos os serviços + frontend
-npm run test:e2e   # 8 cenários ponta a ponta contra a stack em execução
+npm run lint        # ESLint + typescript-eslint over services, frontend and scripts
+npm test            # 58 unit tests (Vitest, in-memory fakes) across services + frontend
+npm run test:e2e    # 9 end-to-end scenarios against the running stack
+npm run test:chaos  # reservation-expiry chaos test (needs a short TTL)
 ```
 
-Os cenários E2E ([`scripts/e2e-saga.ts`](./scripts/e2e-saga.ts)) passam só pelo gateway e criam
-os próprios produtos, então podem rodar repetidamente:
+End-to-end scenarios ([`scripts/e2e-saga.ts`](./scripts/e2e-saga.ts)) go only through the
+gateway and create their own data, so they can run repeatedly:
 
-| Cenário | Verifica |
+| Scenario | Verifies |
 |---|---|
-| Caminho feliz | `PAID`, valor cobrado = total do servidor, reserva convertida em baixa |
-| Compensação | Pagamento recusado → `CANCELLED` e estoque integralmente estornado |
-| Falta de estoque | `STOCK_REJECTED` → `CANCELLED`, nenhuma cobrança criada |
-| Antifraude | Compra acima de R$ 50.000 recusada |
-| Integridade de preço | Preço/nome/SKU enviados pelo cliente são ignorados |
-| Concorrência | 12 pedidos simultâneos por 4 unidades → exatamente 4 pagos, estoque final 0 |
-| Rastreabilidade | `X-Correlation-ID` do cliente preservado pelo gateway |
-| Segurança | Cadastro com `role: ADMIN` vira `CUSTOMER`; cliente não força a Saga nem chama endpoints internos |
+| Happy path | `PAID`, amount charged = server total, reservation turned into a final deduction |
+| Compensation | Declined payment → `CANCELLED` and stock fully released |
+| Out of stock | `STOCK_REJECTED` → `CANCELLED`, no charge created |
+| Anti-fraud | Purchase above R$ 50,000 declined |
+| Price integrity | Price, name and SKU sent by the client are ignored |
+| Concurrency | 12 simultaneous orders for 4 units → exactly 4 paid, final stock 0 |
+| Duplicate SKU | 8 simultaneous product creations → 1 created, 7 `409 Conflict` |
+| Tracing | Client `X-Correlation-ID` preserved by the gateway |
+| Security | `role: ADMIN` sign-up becomes `CUSTOMER`; customers cannot force the Saga or call internal endpoints |
 
-No **CI** (GitHub Actions), cada PR roda build e testes unitários de cada serviço e do frontend.
-Em seguida sobe a stack completa do zero, executa o seed e roda a suíte E2E; se algo falhar, os
-logs dos containers são anexados ao job.
+**CI** (GitHub Actions) runs on every pull request:
+1. lint;
+2. build, unit tests and `npm audit` (high/critical fail the build) for each service and the frontend;
+3. the full stack from scratch, then the seed, the E2E suite and the chaos test, attaching
+   container logs on failure.
 
-## 📚 Documentação
+## Documentation
 
-| Documento | Conteúdo |
+| Document | Contents |
 |---|---|
-| [Visão e Arquitetura](./docs/01-visao-e-arquitetura.md) | Sequência da Saga, garantias, ADRs, limitações |
-| [Contratos de API e Eventos](./docs/04-contratos-api-e-eventos.md) | Endpoints, autorização, eventos e payloads |
-| [Convenções de Código](./docs/03-convencoes-de-codigo.md) | Clean Architecture e padrões do monorepo |
-| [Fluxo, SOLID e Segurança](./docs/06-fluxo-solid-e-seguranca.md) | Processo de PR e checklist de segurança |
+| [Engineering notes](./docs/engineering-notes.md) | Defects found, how they were reproduced, fixed and proven |
+| [Architecture](./docs/01-visao-e-arquitetura.md) | Saga sequence, guarantees, ADRs, limitations (Portuguese) |
+| [API and event contracts](./docs/04-contratos-api-e-eventos.md) | Endpoints, authorization, events and payloads (Portuguese) |
+| [Code conventions](./docs/03-convencoes-de-codigo.md) | Clean Architecture and monorepo patterns (Portuguese) |
+| [Workflow, SOLID and security](./docs/06-fluxo-solid-e-seguranca.md) | PR process, CI gates and security checklist (Portuguese) |
 
-## 📄 Licença
+## License
 
-Distribuído sob a licença MIT. Veja [`LICENSE`](./LICENSE).
+MIT — see [`LICENSE`](./LICENSE).
