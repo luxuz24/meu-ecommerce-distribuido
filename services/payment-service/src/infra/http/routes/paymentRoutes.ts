@@ -51,7 +51,7 @@ export async function registerPaymentRoutes(
               enum: ['APPROVED', 'FAILED'],
             },
             failureReason: { type: 'string', maxLength: 250 },
-            messageId: { type: 'string', maxLength: 120 },
+            messageId: { type: 'string', minLength: 1, maxLength: 120 },
           },
         },
       },

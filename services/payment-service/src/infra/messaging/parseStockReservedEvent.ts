@@ -15,29 +15,27 @@ export function parseStockReservedEvent(
       : raw.payload
     : raw;
 
-  const messageId =
-    properties.messageId ||
-    payload.messageId ||
-    `stock_reserved_${payload.orderId}`;
-
-  const calculatedAmount =
-    typeof payload.total === 'number'
-      ? payload.total
-      : typeof payload.amount === 'number'
-        ? payload.amount
-        : Array.isArray(payload.items)
-          ? payload.items.reduce(
-              (acc: number, i: { price?: number; quantity?: number }) =>
-                acc + Number(i.price ?? 0) * Number(i.quantity ?? 1),
-              0
-            )
-          : 0;
+  // Campos de negócio obrigatórios pelo contrato (docs/04): sem default silencioso.
+  // Um evento inválido lança e vai para a DLQ em vez de virar cobrança de R$ 0,
+  // pedido "undefined" ou pagamento sem dono.
+  const orderId = requiredText(payload.orderId, 'orderId');
+  const userId = requiredText(payload.userId, 'userId');
+  if (typeof payload.total !== 'number' || !Number.isFinite(payload.total) || payload.total < 0) {
+    throw new Error('INVALID_STOCK_RESERVED_EVENT: total must be a finite number >= 0');
+  }
 
   return {
-    orderId: String(payload.orderId),
-    userId: String(payload.userId ?? 'SYSTEM'),
-    amount: Number(calculatedAmount),
-    messageId: String(messageId),
+    orderId,
+    userId,
+    amount: payload.total,
+    messageId: String(properties.messageId || payload.messageId || `stock_reserved_${orderId}`),
     ...(payload.simulateOutcome === 'FAILED' ? { simulateOutcome: 'FAILED' } : {}),
   };
+}
+
+function requiredText(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`INVALID_STOCK_RESERVED_EVENT: ${field} is required`);
+  }
+  return value;
 }

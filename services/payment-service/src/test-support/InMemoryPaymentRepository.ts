@@ -23,6 +23,11 @@ export class InMemoryPaymentRepository implements IPaymentRepository {
       }
     }
 
+    const decided = this.payments.get(data.orderId);
+    if (decided) {
+      return { event: 'ALREADY_PROCESSED', payment: decided };
+    }
+
     const payment = new Payment({
       id: `pay_${data.orderId}`,
       orderId: data.orderId,

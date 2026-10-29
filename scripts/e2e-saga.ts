@@ -275,6 +275,36 @@ scenario('Catálogo: cadastros simultâneos do mesmo SKU geram 1 criação e 409
   );
 });
 
+scenario('Pagamento: decisão é imutável e entregas concorrentes não viram erro', async () => {
+  const product = await newProduct(adminToken, 40, 3);
+  const { order } = await placeOrder(customerToken, { items: [{ productId: product.id, quantity: 1 }] });
+  assert.equal((await waitForFinalStatus(customerToken, order.id)).status, 'PAID');
+  const owner = (await call<{ userId: string }>('GET', `/api/payments/${order.id}`, { token: adminToken })).data.userId;
+
+  // Reprocessar um pagamento já aprovado (rota admin) não pode trocar o resultado
+  const rewrite = await call<{ event: string; payment: { status: string } }>('POST', '/api/payments/process', {
+    token: adminToken,
+    body: { orderId: order.id, userId: owner, amount: 40, simulateOutcome: 'FAILED' },
+  });
+  assert.equal(rewrite.status, 200);
+  assert.equal(rewrite.data.event, 'ALREADY_PROCESSED');
+  const after = await call<{ status: string }>('GET', `/api/payments/${order.id}`, { token: adminToken });
+  assert.equal(after.data.status, 'APPROVED', 'pagamento aprovado não pode virar FAILED');
+
+  // A mesma mensagem entregue 8× em paralelo: um efeito, nenhum erro 500 (que iria para a DLQ)
+  const orderId = `e2e-concurrent-${RUN_ID}`;
+  const attempts = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      call<{ event: string }>('POST', '/api/payments/process', {
+        token: adminToken,
+        body: { orderId, userId: owner, amount: 10, messageId: `msg-${orderId}` },
+      })
+    )
+  );
+  assert.deepEqual([...new Set(attempts.map((r) => r.status))], [200], 'nenhuma entrega concorrente pode falhar');
+  assert.equal(attempts.filter((r) => r.data.event !== 'ALREADY_PROCESSED').length, 1, 'exatamente um efeito');
+});
+
 scenario('Rastreabilidade: o X-Correlation-ID do cliente atravessa o gateway', async () => {
   const product = await newProduct(adminToken, 15, 2);
   const correlationId = `e2e-${randomUUID()}`;

@@ -1,5 +1,6 @@
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 import {
+  InvalidPaymentError,
   PaymentAccessDeniedError,
   PaymentNotFoundError,
 } from '../../../domain/errors/PaymentErrors.js';
@@ -55,7 +56,15 @@ export class PaymentController {
     }>,
     reply: FastifyReply
   ): Promise<void> {
-    const result = await this.processPaymentUseCase.execute(request.body);
-    reply.status(200).send(result);
+    try {
+      const result = await this.processPaymentUseCase.execute(request.body);
+      reply.status(200).send(result);
+    } catch (err) {
+      if (err instanceof InvalidPaymentError) {
+        reply.status(400).send({ error: err.message });
+        return;
+      }
+      throw err;
+    }
   }
 }

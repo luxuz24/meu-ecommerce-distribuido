@@ -16,5 +16,11 @@ export interface ProcessPaymentResult {
 
 export interface IPaymentRepository {
   findByOrderId(orderId: string): Promise<Payment | null>;
+  /**
+   * Grava o pagamento e o evento na outbox, na mesma transação.
+   * Um pagamento já decidido para o mesmo pedido é imutável: devolve ALREADY_PROCESSED
+   * com o pagamento existente e não publica novo evento (vale também para entregas
+   * concorrentes da mesma mensagem).
+   */
   processWithOutbox(data: ProcessPaymentData): Promise<ProcessPaymentResult>;
 }
