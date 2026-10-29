@@ -185,7 +185,7 @@ continua `PAID` e as unidades continuam vendidas.
 
 ```bash
 npm run lint        # ESLint + typescript-eslint em serviços, frontend e scripts
-npm test            # 59 testes unitários (Vitest, fakes in-memory) em serviços + frontend
+npm test            # 62 testes unitários (Vitest, fakes in-memory) em serviços + frontend
 npm run test:e2e    # 9 cenários ponta a ponta contra a stack em execução
 npm run test:chaos  # dois testes de caos: reserva presa e confirmação perdida (requer TTL curto)
 ```

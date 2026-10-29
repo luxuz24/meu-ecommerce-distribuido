@@ -385,6 +385,30 @@ describe('Inventory Service Use Cases & Saga Stock Reservation', () => {
     });
   });
 
+  it('should keep expiring other reservations when one of them fails', async () => {
+    let clock = new Date('2026-10-29T10:00:00Z');
+    const now = () => clock;
+    const reserve = new ReserveStockUseCase(repo, 60_000, now);
+    await upsertUseCase.execute({ productId: 'p1', sku: 'SKU-A', availableQty: 5 });
+    await upsertUseCase.execute({ productId: 'p2', sku: 'SKU-B', availableQty: 5 });
+    await reserve.execute({ orderId: 'o-broken', items: [{ sku: 'SKU-A', quantity: 1 }] });
+    await reserve.execute({ orderId: 'o-healthy', items: [{ sku: 'SKU-B', quantity: 1 }] });
+
+    const original = repo.expireReservation.bind(repo);
+    repo.expireReservation = async (orderId, at) => {
+      if (orderId === 'o-broken') throw new Error('inventory row missing');
+      return original(orderId, at);
+    };
+    const failures: string[] = [];
+    clock = new Date('2026-10-29T10:05:00Z');
+
+    const expired = await new ExpireReservationsUseCase(repo, now, 50, (id) => failures.push(id)).execute();
+
+    expect(expired).toEqual(['o-healthy']);
+    expect(failures).toEqual(['o-broken']);
+    expect((await getBySkuUseCase.execute('SKU-B')).reservedQty).toBe(0);
+  });
+
   it('should never expire a reservation that was already confirmed', async () => {
     let clock = new Date('2026-10-29T10:00:00Z');
     const now = () => clock;

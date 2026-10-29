@@ -53,7 +53,7 @@ export const AuthPage: React.FC = () => {
         setErrorMessage(`${err.statusCode} — ${err.message}`);
         setTelemetry(err.telemetry);
       } else {
-        setErrorMessage('Falha ao conectar ao user-service (:3000).');
+        setErrorMessage('Falha ao conectar à API (gateway :8080 → user-service).');
       }
     } finally {
       setLoading(false);
@@ -84,7 +84,7 @@ export const AuthPage: React.FC = () => {
         setErrorMessage(`${err.statusCode} — ${err.message}`);
         setTelemetry(err.telemetry);
       } else {
-        setErrorMessage('Falha ao conectar ao user-service (:3000).');
+        setErrorMessage('Falha ao conectar à API (gateway :8080 → user-service).');
       }
     } finally {
       setLoading(false);
@@ -131,7 +131,7 @@ export const AuthPage: React.FC = () => {
             <div className="inline-flex items-center gap-1.5 bg-tertiary-container/15 px-2.5 py-0.5 rounded-lg">
               <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
               <span className="font-code-sm text-code-sm text-tertiary font-medium">
-                user-service:3000
+                user-service · gateway :8080
               </span>
             </div>
           </DevOnly>

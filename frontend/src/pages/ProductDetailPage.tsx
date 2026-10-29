@@ -7,7 +7,8 @@ import {
 } from '../components/telemetry/DevTelemetry';
 import { useCart } from '../context/CartContext';
 import type { ApiTelemetryRecord, Product } from '../domain/types';
-import { ApiError, catalogApi } from '../services/api';
+import { ApiError, catalogApi, inventoryApi } from '../services/api';
+import { withLiveStock } from '../domain/stock';
 import { formatBRL } from './CatalogPage';
 
 export const ProductDetailPage: React.FC = () => {
@@ -27,7 +28,8 @@ export const ProductDetailPage: React.FC = () => {
     setError(null);
     try {
       const res = await catalogApi.getProductById(targetId);
-      setProduct(res.data);
+      const stock = await inventoryApi.getBySku(res.data.sku).catch(() => null);
+      setProduct(stock ? withLiveStock([res.data], [stock.data])[0] ?? res.data : res.data);
       setTelemetry(res.telemetry);
       setQty(1);
     } catch (err) {
@@ -74,7 +76,7 @@ export const ProductDetailPage: React.FC = () => {
             <div className="inline-flex items-center gap-1.5 bg-surface-container-low px-2.5 py-0.5 rounded-lg">
               <span className="w-1.5 h-1.5 rounded-full bg-tertiary-fixed-dim animate-pulse" />
               <span className="font-code-sm text-code-sm text-tertiary">
-                catalog-service:3001
+                catalog-service · gateway :8080
               </span>
               {telemetry && (
                 <>

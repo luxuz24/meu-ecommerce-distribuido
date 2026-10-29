@@ -135,6 +135,20 @@ Every entry follows the same structure: **symptom → evidence → root cause �
 - **Fix:** the seed fails loudly (`exit 1`) and checks each effect; the E2E suite
   soft-deletes its own products.
 
+## 10. One broken reservation stopped every expiry
+
+- **Symptom:** after test data cleanup removed an inventory row, overdue reservations
+  stopped expiring altogether.
+- **Evidence:** with a short TTL, a reservation whose SKU row was missing (A) and a healthy
+  one (B): after 25 s both were still `RESERVED`, B's stock stuck at `4/1`, and the sweeper
+  had failed 9 times in a row.
+- **Root cause:** the sweeper processed overdue reservations oldest-first and let the first
+  exception abort the whole batch, so a single bad record acted as a poison pill.
+- **Fix:** failures are isolated per reservation (logged and retried later); the rest of the
+  batch proceeds.
+- **Proof:** the same setup now expires B (`5/0`) while A is logged; unit test with a
+  repository that fails for one order.
+
 ---
 
 ## Lessons

@@ -159,7 +159,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
                     }`}
                   />
                   <span className="font-code-sm text-code-sm text-on-surface-variant">
-                    User API: :3000
+                    user-service · gateway :8080
                     {userServiceHealth.latencyMs !== null
                       ? ` (${userServiceHealth.latencyMs}ms)`
                       : userServiceHealth.online
@@ -176,7 +176,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({
                     }`}
                   />
                   <span className="font-code-sm text-code-sm text-on-surface-variant">
-                    Catalog API: :3001
+                    catalog-service · gateway :8080
                     {catalogServiceHealth.latencyMs !== null
                       ? ` (${catalogServiceHealth.latencyMs}ms)`
                       : catalogServiceHealth.online
