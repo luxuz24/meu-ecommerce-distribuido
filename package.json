@@ -24,6 +24,14 @@
     "build:frontend": "npm --prefix frontend run build",
     "build": "npm run build:user && npm run build:catalog && npm run build:inventory && npm run build:order && npm run build:payment && npm run build:outbox && npm run build:notification && npm run build:frontend",
     "seed:demo": "npx --yes tsx scripts/seed-demo.ts",
-    "test:e2e": "npx --yes tsx scripts/e2e-saga.ts"
+    "test:e2e": "npx --yes tsx scripts/e2e-saga.ts",
+    "test:chaos": "bash scripts/chaos/reservation-expiry.sh",
+    "lint": "eslint services/*/src frontend/src scripts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "typescript-eslint": "^8.72.1"
   }
 }
