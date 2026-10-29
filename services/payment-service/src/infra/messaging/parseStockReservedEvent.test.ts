@@ -40,4 +40,19 @@ describe('parseStockReservedEvent', () => {
   it('rejects a body that is not JSON', () => {
     expect(() => parseStockReservedEvent('not-json', {})).toThrow();
   });
+
+  it('accepts a zero total (free products are valid)', () => {
+    expect(parseStockReservedEvent(body({ ...event, total: 0 }), {}).amount).toBe(0);
+  });
+
+  it('rejects a total that JSON.parse turns into Infinity', () => {
+    expect(() => parseStockReservedEvent('{"orderId":"o1","userId":"u1","total":1e400}', {})).toThrow(
+      'INVALID_STOCK_RESERVED_EVENT: total must be a finite number >= 0'
+    );
+  });
+
+  it('names the missing field in the error', () => {
+    expect(() => parseStockReservedEvent(body({ userId: 'u1', total: 1 }), {})).toThrow('orderId is required');
+    expect(() => parseStockReservedEvent(body({ orderId: 'o1', total: 1 }), {})).toThrow('userId is required');
+  });
 });

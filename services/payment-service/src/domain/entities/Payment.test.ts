@@ -27,4 +27,17 @@ describe('Payment entity invariants', () => {
   ])('rejects %s with a domain error', (_label, override) => {
     expect(() => new Payment({ ...base, ...override })).toThrow(InvalidPaymentError);
   });
+
+  it('explains which field is invalid (the message is returned to API clients)', () => {
+    expect(() => new Payment({ ...base, orderId: '' })).toThrow('INVALID_PAYMENT: orderId is required');
+    expect(() => new Payment({ ...base, userId: '' })).toThrow('INVALID_PAYMENT: userId is required');
+    expect(() => new Payment({ ...base, amount: -1 })).toThrow('INVALID_PAYMENT: amount must be a finite number >= 0');
+  });
+
+  it('trims the owner and keeps a provided creation date, defaulting to now', () => {
+    const created = new Date('2026-01-01T00:00:00Z');
+    expect(new Payment({ ...base, userId: '  u1  ', createdAt: created }).userId).toBe('u1');
+    expect(new Payment({ ...base, createdAt: created }).createdAt).toBe(created);
+    expect(new Payment(base).createdAt).toBeInstanceOf(Date);
+  });
 });

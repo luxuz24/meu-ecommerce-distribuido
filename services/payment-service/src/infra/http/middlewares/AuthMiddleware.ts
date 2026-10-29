@@ -37,7 +37,9 @@ export function verifyTokenHeader(authHeader: string | undefined, secret: string
 export async function requireAdminAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    reply.status(500).send({ error: 'CRITICAL: JWT_SECRET not configured' });
+    // Detalhe de configuração vai para o log, nunca para o cliente
+    request.log.error('JWT_SECRET is not configured');
+    reply.status(500).send({ error: 'Internal Server Error' });
     return;
   }
 
@@ -56,7 +58,9 @@ export async function requireAdminAuth(request: FastifyRequest, reply: FastifyRe
 export async function requireUserAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    reply.status(500).send({ error: 'CRITICAL: JWT_SECRET not configured' });
+    // Detalhe de configuração vai para o log, nunca para o cliente
+    request.log.error('JWT_SECRET is not configured');
+    reply.status(500).send({ error: 'Internal Server Error' });
     return;
   }
 

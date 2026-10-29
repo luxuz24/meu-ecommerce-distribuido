@@ -152,4 +152,13 @@ describe('Payment Service Use Cases & Saga Compensation', () => {
     const found = await getPaymentByOrderIdUseCase.execute('  trim-me  ', { userId: 'owner', role: 'CUSTOMER' });
     expect(found.orderId).toBe('trim-me');
   });
+
+  it('hands normalized data to the repository (it is stored as received)', async () => {
+    await processPaymentUseCase.execute({ orderId: '  ord-n  ', userId: '  u-n  ', amount: 10.129, messageId: 'm-n' });
+    expect(repo.lastProcessData).toEqual({ orderId: 'ord-n', userId: 'u-n', amount: 10.13, status: 'APPROVED', messageId: 'm-n' });
+
+    await processPaymentUseCase.execute({ orderId: 'ord-m', userId: 'u', amount: 1 });
+    expect(repo.lastProcessData).not.toHaveProperty('messageId');
+    expect(repo.lastProcessData).not.toHaveProperty('failureReason');
+  });
 });

@@ -10,12 +10,15 @@ export class InMemoryPaymentRepository implements IPaymentRepository {
   private payments = new Map<string, Payment>();
   private processedMessages = new Set<string>();
   public outboxEvents: Array<{ eventType: string; payload: unknown }> = [];
+  /** Último input recebido: o repositório real grava estes valores sem normalizar. */
+  public lastProcessData: ProcessPaymentData | undefined;
 
   async findByOrderId(orderId: string): Promise<Payment | null> {
     return this.payments.get(orderId) ?? null;
   }
 
   async processWithOutbox(data: ProcessPaymentData): Promise<ProcessPaymentResult> {
+    this.lastProcessData = data;
     if (data.messageId && this.processedMessages.has(data.messageId)) {
       const existing = this.payments.get(data.orderId);
       if (existing) {
