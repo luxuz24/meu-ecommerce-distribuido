@@ -188,9 +188,10 @@ was lost: the reservation expires, but the order stays `PAID` and its units stay
 
 ```bash
 npm run lint        # ESLint + typescript-eslint over services, frontend and scripts
-npm test            # 62 unit tests (Vitest, in-memory fakes) across services + frontend
+npm test            # 144 unit tests (Vitest, in-memory fakes) across services + frontend
 npm run test:e2e    # 9 end-to-end scenarios against the running stack
 npm run test:chaos  # two chaos tests: stuck reservation and lost confirmation (need a short TTL)
+npm run test:mutation --prefix services/payment-service   # mutation testing (Stryker)
 ```
 
 End-to-end scenarios ([`scripts/e2e-saga.ts`](./scripts/e2e-saga.ts)) go only through the

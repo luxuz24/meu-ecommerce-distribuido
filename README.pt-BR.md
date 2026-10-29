@@ -185,9 +185,10 @@ continua `PAID` e as unidades continuam vendidas.
 
 ```bash
 npm run lint        # ESLint + typescript-eslint em serviços, frontend e scripts
-npm test            # 62 testes unitários (Vitest, fakes in-memory) em serviços + frontend
+npm test            # 144 testes unitários (Vitest, fakes in-memory) em serviços + frontend
 npm run test:e2e    # 9 cenários ponta a ponta contra a stack em execução
 npm run test:chaos  # dois testes de caos: reserva presa e confirmação perdida (requer TTL curto)
+npm run test:mutation --prefix services/payment-service   # teste de mutação (Stryker)
 ```
 
 Os cenários E2E ([`scripts/e2e-saga.ts`](./scripts/e2e-saga.ts)) passam só pelo gateway e
