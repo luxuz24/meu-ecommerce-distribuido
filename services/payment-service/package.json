@@ -7,7 +7,8 @@
     "test": "vitest run",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "npx prisma migrate deploy && node dist/server.js"
+    "start": "npx prisma migrate deploy && node dist/server.js",
+    "test:mutation": "stryker run"
   },
   "license": "ISC",
   "type": "module",
@@ -24,6 +25,8 @@
     "pg": "^8.22.0"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@types/amqplib": "^0.10.8",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.1.1",

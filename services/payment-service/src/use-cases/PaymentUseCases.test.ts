@@ -1,65 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Payment } from '../domain/entities/Payment.js';
-import { PaymentAccessDeniedError, PaymentNotFoundError } from '../domain/errors/PaymentErrors.js';
 import {
-  type IPaymentRepository,
-  type ProcessPaymentData,
-  type ProcessPaymentResult,
-} from '../domain/repositories/IPaymentRepository.js';
+  InvalidPaymentError,
+  PaymentAccessDeniedError,
+  PaymentNotFoundError,
+} from '../domain/errors/PaymentErrors.js';
+import { InMemoryPaymentRepository } from '../test-support/InMemoryPaymentRepository.js';
 import {
+  ANTI_FRAUD_LIMIT,
   GetPaymentByOrderIdUseCase,
   ProcessPaymentUseCase,
 } from './PaymentUseCases.js';
-
-class InMemoryPaymentRepository implements IPaymentRepository {
-  private payments = new Map<string, Payment>();
-  private processedMessages = new Set<string>();
-  public outboxEvents: Array<{ eventType: string; payload: unknown }> = [];
-
-  async findByOrderId(orderId: string): Promise<Payment | null> {
-    return this.payments.get(orderId) ?? null;
-  }
-
-  async processWithOutbox(data: ProcessPaymentData): Promise<ProcessPaymentResult> {
-    if (data.messageId && this.processedMessages.has(data.messageId)) {
-      const existing = this.payments.get(data.orderId);
-      if (existing) {
-        return { event: 'ALREADY_PROCESSED', payment: existing };
-      }
-    }
-
-    const payment = new Payment({
-      id: `pay_${data.orderId}`,
-      orderId: data.orderId,
-      userId: data.userId,
-      amount: data.amount,
-      status: data.status,
-      failureReason: data.failureReason ?? null,
-    });
-
-    this.payments.set(data.orderId, payment);
-    if (data.messageId) {
-      this.processedMessages.add(data.messageId);
-    }
-
-    const eventType =
-      data.status === 'APPROVED' ? 'PAYMENT_APPROVED' : 'PAYMENT_FAILED';
-
-    this.outboxEvents.push({
-      eventType,
-      payload: {
-        orderId: payment.orderId,
-        paymentId: payment.id,
-        userId: payment.userId,
-        amount: payment.amount,
-        status: payment.status,
-        ...(payment.failureReason ? { reason: payment.failureReason } : {}),
-      },
-    });
-
-    return { event: eventType, payment };
-  }
-}
 
 describe('Payment Service Use Cases & Saga Compensation', () => {
   let repo: InMemoryPaymentRepository;
@@ -141,5 +91,75 @@ describe('Payment Service Use Cases & Saga Compensation', () => {
     await expect(
       getPaymentByOrderIdUseCase.execute('ord-owned', { userId: 'intruder', role: 'CUSTOMER' })
     ).rejects.toThrow(PaymentAccessDeniedError);
+  });
+
+  // Tabela de decisão da regra antifraude: (simulação, valor) → resultado
+  it.each([
+    ['sem simulação, abaixo do limite → APPROVED', undefined, 100, 'APPROVED'],
+    ['sem simulação, no limite exato → APPROVED', undefined, ANTI_FRAUD_LIMIT, 'APPROVED'],
+    ['sem simulação, 1 centavo acima → FAILED', undefined, ANTI_FRAUD_LIMIT + 0.01, 'FAILED'],
+    ['simulação FAILED, valor baixo → FAILED', 'FAILED', 100, 'FAILED'],
+    ['simulação APPROVED, valor baixo → APPROVED', 'APPROVED', 100, 'APPROVED'],
+    ['simulação APPROVED acima do limite → FAILED (não fura o antifraude)', 'APPROVED', 60000, 'FAILED'],
+  ] as const)('decisão: %s', async (_label, simulateOutcome, amount, expected) => {
+    const res = await processPaymentUseCase.execute({
+      orderId: `ord-${amount}-${simulateOutcome ?? 'none'}`,
+      userId: 'u1',
+      amount,
+      ...(simulateOutcome ? { simulateOutcome } : {}),
+    });
+    expect(res.payment.status).toBe(expected);
+    expect(res.event).toBe(expected === 'APPROVED' ? 'PAYMENT_APPROVED' : 'PAYMENT_FAILED');
+  });
+
+  it('uses the default decline reason unless one is provided, and none when approved', async () => {
+    const declined = await processPaymentUseCase.execute({ orderId: 'r1', userId: 'u', amount: 60000 });
+    expect(declined.payment.failureReason).toBe('DECLINED_BY_ISSUER_OR_RISK_LIMIT');
+
+    const custom = await processPaymentUseCase.execute({
+      orderId: 'r2', userId: 'u', amount: 1, simulateOutcome: 'FAILED', failureReason: 'CARD_EXPIRED',
+    });
+    expect(custom.payment.failureReason).toBe('CARD_EXPIRED');
+
+    const approved = await processPaymentUseCase.execute({
+      orderId: 'r3', userId: 'u', amount: 1, failureReason: 'IGNORED',
+    });
+    expect(approved.payment.failureReason).toBeNull();
+  });
+
+  it.each([
+    ['blank orderId', { orderId: '   ', userId: 'u', amount: 1 }],
+    ['missing owner', { orderId: 'o', amount: 1 }],
+    ['negative amount', { orderId: 'o', userId: 'u', amount: -1 }],
+    ['NaN amount', { orderId: 'o', userId: 'u', amount: Number.NaN }],
+  ])('rejects %s with a domain error (no payment, no event)', async (_label, input) => {
+    await expect(processPaymentUseCase.execute(input)).rejects.toThrow(InvalidPaymentError);
+    expect(repo.outboxEvents).toHaveLength(0);
+  });
+
+  it('never rewrites a payment that was already decided (no second event)', async () => {
+    await processPaymentUseCase.execute({ orderId: 'decided', userId: 'u', amount: 10 });
+    const second = await processPaymentUseCase.execute({
+      orderId: 'decided', userId: 'u', amount: 10, simulateOutcome: 'FAILED',
+    });
+
+    expect(second.event).toBe('ALREADY_PROCESSED');
+    expect(second.payment.status).toBe('APPROVED');
+    expect(repo.outboxEvents).toHaveLength(1);
+  });
+
+  it('trims the order id before looking the payment up', async () => {
+    await processPaymentUseCase.execute({ orderId: 'trim-me', userId: 'owner', amount: 5 });
+    const found = await getPaymentByOrderIdUseCase.execute('  trim-me  ', { userId: 'owner', role: 'CUSTOMER' });
+    expect(found.orderId).toBe('trim-me');
+  });
+
+  it('hands normalized data to the repository (it is stored as received)', async () => {
+    await processPaymentUseCase.execute({ orderId: '  ord-n  ', userId: '  u-n  ', amount: 10.129, messageId: 'm-n' });
+    expect(repo.lastProcessData).toEqual({ orderId: 'ord-n', userId: 'u-n', amount: 10.13, status: 'APPROVED', messageId: 'm-n' });
+
+    await processPaymentUseCase.execute({ orderId: 'ord-m', userId: 'u', amount: 1 });
+    expect(repo.lastProcessData).not.toHaveProperty('messageId');
+    expect(repo.lastProcessData).not.toHaveProperty('failureReason');
   });
 });

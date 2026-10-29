@@ -2,6 +2,10 @@ import { type FastifyInstance } from 'fastify';
 import { type PaymentController } from '../controllers/PaymentController.js';
 import { requireAdminAuth, requireUserAuth } from '../middlewares/AuthMiddleware.js';
 
+// Mesmo limite nas duas rotas: o Fastify recusa parâmetros de rota acima de 100 caracteres
+// (maxParamLength, 414), então um pagamento criado com id maior nunca poderia ser consultado.
+const ORDER_ID_MAX_LENGTH = 100;
+
 export async function registerPaymentRoutes(
   app: FastifyInstance,
   controller: PaymentController
@@ -16,7 +20,7 @@ export async function registerPaymentRoutes(
           required: ['orderId'],
           additionalProperties: false,
           properties: {
-            orderId: { type: 'string', minLength: 1, maxLength: 120 },
+            orderId: { type: 'string', minLength: 1, maxLength: ORDER_ID_MAX_LENGTH },
           },
         },
       },
@@ -43,7 +47,7 @@ export async function registerPaymentRoutes(
           required: ['orderId', 'amount'],
           additionalProperties: false,
           properties: {
-            orderId: { type: 'string', minLength: 1, maxLength: 120 },
+            orderId: { type: 'string', minLength: 1, maxLength: ORDER_ID_MAX_LENGTH },
             userId: { type: 'string', minLength: 1, maxLength: 120 },
             amount: { type: 'number', minimum: 0, maximum: 10000000 },
             simulateOutcome: {
@@ -51,7 +55,7 @@ export async function registerPaymentRoutes(
               enum: ['APPROVED', 'FAILED'],
             },
             failureReason: { type: 'string', maxLength: 250 },
-            messageId: { type: 'string', maxLength: 120 },
+            messageId: { type: 'string', minLength: 1, maxLength: 120 },
           },
         },
       },

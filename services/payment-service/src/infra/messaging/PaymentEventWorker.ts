@@ -3,6 +3,7 @@ import { type PrismaClient } from '@prisma/client';
 import { type ProcessPaymentUseCase } from '../../use-cases/PaymentUseCases.js';
 import { ResilientRabbitConnection, startOutboxRelay } from './ResilientRabbit.js';
 import { runWithCorrelationId } from '../observability/correlation.js';
+import { parseStockReservedEvent } from './parseStockReservedEvent.js';
 
 const EXCHANGE_NAME = 'ecommerce_events';
 const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
@@ -47,40 +48,9 @@ export function startPaymentMessaging(
       if (!msg) return;
       void traced(msg, async () => {
         try {
-          const raw = JSON.parse(msg.content.toString());
-          const payload = raw.payload
-            ? typeof raw.payload === 'string'
-              ? JSON.parse(raw.payload)
-              : raw.payload
-            : raw;
-
-          const messageId =
-            msg.properties.messageId ||
-            payload.messageId ||
-            `stock_reserved_${payload.orderId}`;
-
-          const calculatedAmount =
-            typeof payload.total === 'number'
-              ? payload.total
-              : typeof payload.amount === 'number'
-                ? payload.amount
-                : Array.isArray(payload.items)
-                  ? payload.items.reduce(
-                      (acc: number, i: { price?: number; quantity?: number }) =>
-                        acc + Number(i.price ?? 0) * Number(i.quantity ?? 1),
-                      0
-                    )
-                  : 0;
-
-          await processPaymentUseCase.execute({
-            orderId: String(payload.orderId),
-            userId: String(payload.userId ?? 'SYSTEM'),
-            amount: Number(calculatedAmount),
-            messageId: String(messageId),
-            ...(payload.simulateOutcome === 'FAILED'
-              ? { simulateOutcome: 'FAILED' }
-              : {}),
-          });
+          await processPaymentUseCase.execute(
+            parseStockReservedEvent(msg.content.toString(), msg.properties)
+          );
 
           channel.ack(msg);
         } catch (err) {

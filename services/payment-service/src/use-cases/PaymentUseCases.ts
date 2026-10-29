@@ -1,9 +1,12 @@
-import { type Payment } from '../domain/entities/Payment.js';
+import { assertValidPayment, type Payment } from '../domain/entities/Payment.js';
 import { PaymentAccessDeniedError, PaymentNotFoundError } from '../domain/errors/PaymentErrors.js';
 import {
   type IPaymentRepository,
   type ProcessPaymentResult,
 } from '../domain/repositories/IPaymentRepository.js';
+
+/** Acima deste valor o pagamento é recusado pela regra antifraude (o valor exato é aprovado). */
+export const ANTI_FRAUD_LIMIT = 50_000;
 
 export interface ProcessPaymentInput {
   orderId: string;
@@ -18,17 +21,11 @@ export class ProcessPaymentUseCase {
   constructor(private readonly paymentRepository: IPaymentRepository) {}
 
   async execute(input: ProcessPaymentInput): Promise<ProcessPaymentResult> {
-    if (!input.orderId || !input.orderId.trim()) {
-      throw new Error('PAYMENT_ORDER_ID_REQUIRED');
-    }
-    if (input.amount < 0) {
-      throw new Error('PAYMENT_NEGATIVE_AMOUNT');
-    }
+    assertValidPayment(input);
 
-    // Business rule: approve unless simulateOutcome === 'FAILED' or amount > 50000 (high-risk anti-fraud ceiling)
-    const shouldFail =
-      input.simulateOutcome === 'FAILED' ||
-      (input.simulateOutcome === undefined && input.amount > 50000);
+    // A simulação só pode FORÇAR uma recusa (demonstração da compensação);
+    // nunca aprova o que a regra antifraude recusaria.
+    const shouldFail = input.simulateOutcome === 'FAILED' || input.amount > ANTI_FRAUD_LIMIT;
 
     const status = shouldFail ? 'FAILED' : 'APPROVED';
     const reason = shouldFail
@@ -37,7 +34,7 @@ export class ProcessPaymentUseCase {
 
     return this.paymentRepository.processWithOutbox({
       orderId: input.orderId.trim(),
-      userId: (input.userId ?? 'SYSTEM').trim(),
+      userId: input.userId.trim(),
       amount: Number(input.amount.toFixed(2)),
       status,
       ...(reason !== undefined ? { failureReason: reason } : {}),

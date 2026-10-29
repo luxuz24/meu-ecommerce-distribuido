@@ -51,10 +51,10 @@ A conta ADMIN é provisionada no boot do user-service a partir de `ADMIN_EMAIL`/
 ## payment-service
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| GET | `/api/payments/:orderId` | dono ou ADMIN | `{id,orderId,userId,amount,status,failureReason,createdAt}`; 403 / 404 |
-| POST | `/api/payments/process` | ADMIN | processamento manual; o fluxo normal é o evento `stock_reserved` |
+| GET | `/api/payments/:orderId` | dono ou ADMIN | `{id,orderId,userId,amount,status,failureReason,createdAt}`; 403 / 404. `orderId` até 100 caracteres (limite de parâmetro do Fastify) |
+| POST | `/api/payments/process` | ADMIN | processamento manual (o fluxo normal é o evento `stock_reserved`). `{orderId (≤100), userId, amount, simulateOutcome?, failureReason?, messageId?}`; `userId` ausente → 400. Pagamento já decidido para o pedido é **imutável**: responde `ALREADY_PROCESSED` sem novo evento |
 
-Regra antifraude: pagamentos acima de **R$ 50.000** são recusados.
+Regra antifraude: pagamentos acima de **R$ 50.000** são recusados (o valor exato é aprovado). `simulateOutcome` só pode **forçar** uma recusa — `APPROVED` nunca fura o limite.
 
 ## Prazo das reservas
 Toda reserva nasce com `expiresAt = agora + RESERVATION_TTL_SECONDS` (padrão 900s). Um sweeper no inventory-service (`RESERVATION_SWEEP_INTERVAL_MS`, padrão 15s) expira reservas `RESERVED` vencidas com transição condicional, devolve o estoque e publica `stock_reservation_expired`; o order-service cancela o pedido se ele ainda não foi pago. Se o pedido já estiver `PAID` (a confirmação se perdeu), o order-service reemite `ORDER_CONFIRMED` com `replay: true` e o inventory readquire o estoque com o mesmo update condicional; o notification-service ignora replays.
@@ -69,7 +69,7 @@ Propriedades AMQP de toda mensagem publicada pela outbox: `messageId` = id da li
 |---|---|---|---|---|
 | USER_CREATED | `user_created` | user-service | notification | `{name,email,role}` |
 | ORDER_CREATED | `order_created` | order | inventory | `{orderId,userId,total,simulateOutcome?,items:[{productId,sku,name,price,quantity}]}` |
-| STOCK_RESERVED | `stock_reserved` | inventory | order, payment | `{orderId,reservationId,userId,total,simulateOutcome?,items}` |
+| STOCK_RESERVED | `stock_reserved` | inventory | order, payment | `{orderId,reservationId,userId,total,simulateOutcome?,items}` — `orderId`, `userId` e `total` (número finito ≥ 0) são **obrigatórios**: sem eles o payment-service recusa o evento (DLQ) em vez de cobrar R$ 0 ou criar pagamento sem dono |
 | STOCK_REJECTED | `stock_rejected` | inventory | order | `{orderId,reason,items}` — `reason`: `INSUFFICIENT_STOCK:<sku>` ou `SKU_NOT_FOUND:<sku>` |
 | STOCK_RELEASED | `stock_released` | inventory | — (auditoria) | `{orderId,items}` |
 | STOCK_RESERVATION_EXPIRED | `stock_reservation_expired` | inventory (sweeper) | order | `{orderId,reason:"RESERVATION_EXPIRED",items}` — a reserva venceu sem a Saga concluir; o estoque já foi devolvido |

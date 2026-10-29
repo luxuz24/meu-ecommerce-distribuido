@@ -11,3 +11,10 @@ export class PaymentAccessDeniedError extends Error {
     this.name = 'PaymentAccessDeniedError';
   }
 }
+
+export class InvalidPaymentError extends Error {
+  constructor(reason: string) {
+    super(`INVALID_PAYMENT: ${reason}`);
+    this.name = 'InvalidPaymentError';
+  }
+}

@@ -26,7 +26,7 @@ const start = async () => {
 
     const rawOrigins =
       process.env.CORS_ORIGINS ??
-      'http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:8080';
+      'http://localhost:3002,http://localhost:8080';
     const allowedOrigins = rawOrigins
       .split(',')
       .map((o) => o.trim())
@@ -38,7 +38,9 @@ const start = async () => {
           cb(null, true);
           return;
         }
-        cb(new Error('Not allowed by CORS'), false);
+        // Recusa sem erro: a resposta sai sem cabeçalhos CORS e o navegador bloqueia.
+        // (Um Error aqui virava 500 + log de erro para uma simples origem não permitida.)
+        cb(null, false);
       },
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID'],
