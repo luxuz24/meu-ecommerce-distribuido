@@ -28,7 +28,10 @@ export class ProductController {
       const product = await this.createProductUseCase.execute(data);
       return reply.status(201).send(product);
     } catch (error: unknown) {
-      if (error instanceof ProductAlreadyExistsError || error instanceof InvalidProductDataError) {
+      if (error instanceof ProductAlreadyExistsError) {
+        return reply.status(409).send({ error: error.message });
+      }
+      if (error instanceof InvalidProductDataError) {
         return reply.status(400).send({ error: error.message });
       }
       request.log.error(error);

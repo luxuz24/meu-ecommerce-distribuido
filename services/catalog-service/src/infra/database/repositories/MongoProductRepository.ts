@@ -1,3 +1,4 @@
+import { ProductAlreadyExistsError } from '../../../domain/errors/ProductAlreadyExistsError.js';
 import mongoose from 'mongoose';
 import { Product } from '../../../domain/entities/Product.js';
 import {
@@ -75,14 +76,23 @@ export class MongoProductRepository implements IProductRepository {
   }
 
   async create(data: CreateProductDTO): Promise<Product> {
-    const document = await ProductModel.create({
-      name: String(data.name),
-      description: String(data.description),
-      sku: String(data.sku),
-      price: Number(data.price),
-      stock: Number(data.stock),
-    });
-    return this.mapToDomain(document);
+    try {
+      const document = await ProductModel.create({
+        name: String(data.name),
+        description: String(data.description),
+        sku: String(data.sku),
+        price: Number(data.price),
+        stock: Number(data.stock),
+      });
+      return this.mapToDomain(document);
+    } catch (error: unknown) {
+      // Duas criações simultâneas passam pela checagem do use case; o índice único
+      // decide quem vence e a perdedora vira o mesmo erro de domínio (409), não 500.
+      if ((error as { code?: number }).code === 11000) {
+        throw new ProductAlreadyExistsError(String(data.sku));
+      }
+      throw error;
+    }
   }
 
   async update(id: string, data: UpdateProductDTO): Promise<Product | null> {
