@@ -57,7 +57,7 @@ A conta ADMIN é provisionada no boot do user-service a partir de `ADMIN_EMAIL`/
 Regra antifraude: pagamentos acima de **R$ 50.000** são recusados.
 
 ## Prazo das reservas
-Toda reserva nasce com `expiresAt = agora + RESERVATION_TTL_SECONDS` (padrão 900s). Um sweeper no inventory-service (`RESERVATION_SWEEP_INTERVAL_MS`, padrão 15s) expira reservas `RESERVED` vencidas com transição condicional, devolve o estoque e publica `stock_reservation_expired`; o order-service cancela o pedido se ele ainda não foi pago. Se a aprovação do pagamento chegar depois da expiração, o inventory tenta readquirir o estoque com o mesmo update condicional.
+Toda reserva nasce com `expiresAt = agora + RESERVATION_TTL_SECONDS` (padrão 900s). Um sweeper no inventory-service (`RESERVATION_SWEEP_INTERVAL_MS`, padrão 15s) expira reservas `RESERVED` vencidas com transição condicional, devolve o estoque e publica `stock_reservation_expired`; o order-service cancela o pedido se ele ainda não foi pago. Se o pedido já estiver `PAID` (a confirmação se perdeu), o order-service reemite `ORDER_CONFIRMED` com `replay: true` e o inventory readquire o estoque com o mesmo update condicional; o notification-service ignora replays.
 
 ## Eventos — exchange `ecommerce_events` (topic, durable)
 
@@ -75,7 +75,7 @@ Propriedades AMQP de toda mensagem publicada pela outbox: `messageId` = id da li
 | STOCK_RESERVATION_EXPIRED | `stock_reservation_expired` | inventory (sweeper) | order | `{orderId,reason:"RESERVATION_EXPIRED",items}` — a reserva venceu sem a Saga concluir; o estoque já foi devolvido |
 | PAYMENT_APPROVED | `payment_approved` | payment | order | `{orderId,paymentId,userId,amount,status}` |
 | PAYMENT_FAILED | `payment_failed` | payment | order, inventory, notification | `{orderId,paymentId,userId,amount,status,reason}` |
-| ORDER_CONFIRMED | `order_confirmed` | order | inventory, notification | `{orderId,userId,total}` |
+| ORDER_CONFIRMED | `order_confirmed` | order | inventory, notification | `{orderId,userId,total,replay?}` — `replay: true` quando reemitido para reconciliar uma reserva expirada |
 | ORDER_CANCELLED | `order_cancelled` | order | notification | `{orderId,userId,reason}` |
 
 Cada fila de consumo tem uma DLQ (`<fila>_dlq`) ligada ao exchange `ecommerce_events_dlx`.

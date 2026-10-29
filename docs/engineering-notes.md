@@ -108,6 +108,15 @@ Every entry follows the same structure: **symptom → evidence → root cause �
   the same conditional update.
 - **Proof:** the same failure now ends `CANCELLED (RESERVATION_EXPIRED)` with stock
   restored. `scripts/chaos/reservation-expiry.sh` runs it in CI.
+- **Second-order defect found while verifying the fix:** the sweeper also expired the
+  reservations of seven orders that were already **paid** but whose confirmation had
+  been lost, putting 9 sold units back on sale (`KB-1234` went from 45 to 54 available).
+  Fix: when `order-service` receives an expiry for a `PAID` order, it replays
+  `ORDER_CONFIRMED` (flagged `replay`, so no duplicate e-mail), and inventory re-acquires
+  the stock through the late-confirmation path. Re-delivering the expiry for those seven
+  orders restored `KB-1234` to 45 with all reservations `CONFIRMED`.
+  `scripts/chaos/lost-confirmation.sh` covers it and was shown to fail without the fix
+  (`10/0` instead of `8/0`).
 
 ## 8. A critical vulnerability hidden in a lockfile
 

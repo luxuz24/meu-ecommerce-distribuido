@@ -87,6 +87,7 @@ sequenceDiagram
 | Duas reservas disputando o mesmo saldo | `UPDATE … WHERE availableQty >= qty` + `CHECK (availableQty >= 0)` | inventory-service | E2E: 12 pedidos simultâneos por 4 unidades |
 | Falha no meio da Saga | Compensação: `payment_failed` estorna a reserva | inventory-service | E2E: cenário de pagamento recusado |
 | Etapa que nunca responde (ex.: mensagem do pagamento na DLQ) | Reserva com prazo (`expiresAt`) + sweeper com transição condicional → `stock_reservation_expired` cancela o pedido | inventory + order | Teste de caos no CI (`scripts/chaos/reservation-expiry.sh`) |
+| Confirmação de pedido pago perdida (reserva expiraria com unidades vendidas) | Expiração de pedido `PAID` faz o order-service reemitir `ORDER_CONFIRMED` (`replay`); o inventory readquire o estoque | order + inventory | Teste de caos no CI (`scripts/chaos/lost-confirmation.sh`) |
 | Cliente adulterando preço | Preço, nome e SKU resolvidos no catálogo | order-service | unitário + E2E |
 | Broker indisponível no boot ou em produção | Reconexão com backoff (1s→30s) e redeclaração da topologia | `ResilientRabbit.ts` em cada serviço | cold start sem reinícios; teste de caos |
 | Mensagem envenenada travando a fila | DLX `ecommerce_events_dlx` + filas `*_dlq` | todos os consumers | topologia declarada no código |

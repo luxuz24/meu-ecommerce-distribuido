@@ -94,6 +94,7 @@ O diagrama de sequência completo está em [docs/01](./docs/01-visao-e-arquitetu
 | Dois pedidos disputando o mesmo item | `UPDATE … WHERE available_qty >= qty` + `CHECK (available_qty >= 0)` | E2E: 12 pedidos simultâneos por 4 unidades → exatamente 4 pagos |
 | Falha no meio da Saga | Compensação: `payment_failed` estorna a reserva | E2E |
 | Etapa que nunca responde | Expiração de reservas com sweeper condicional | Teste de caos no CI |
+| Confirmação perdida de pedido pago | Expiração de pedido `PAID` reemite `ORDER_CONFIRMED`; o inventory readquire o estoque | Teste de caos no CI |
 | Cliente adulterando o preço | Preço resolvido no `catalog-service`; o que vem do cliente é descartado | Unitário + E2E |
 | Broker fora do ar | Reconexão com backoff (1 s → 30 s), topologia redeclarada, `/health` em `503` enquanto degradado | Teste de caos |
 | Mensagem envenenada | Dead Letter Exchange + uma `*_dlq` por fila | — |
@@ -173,8 +174,10 @@ RESERVATION_TTL_SECONDS=15 RESERVATION_SWEEP_INTERVAL_MS=2000 docker compose up 
 npm run test:chaos
 ```
 
-O script faz o banco do `payment-service` falhar para que a mensagem de pagamento vá para a
-DLQ. A reserva expira, o estoque volta e o pedido termina `CANCELLED (RESERVATION_EXPIRED)`.
+O primeiro script faz o banco do `payment-service` falhar para que a mensagem de pagamento vá
+para a DLQ: a reserva expira, o estoque volta e o pedido termina `CANCELLED (RESERVATION_EXPIRED)`.
+O segundo simula um pedido pago cuja confirmação se perdeu: a reserva expira, mas o pedido
+continua `PAID` e as unidades continuam vendidas.
 
 ---
 
@@ -182,9 +185,9 @@ DLQ. A reserva expira, o estoque volta e o pedido termina `CANCELLED (RESERVATIO
 
 ```bash
 npm run lint        # ESLint + typescript-eslint em serviços, frontend e scripts
-npm test            # 58 testes unitários (Vitest, fakes in-memory) em serviços + frontend
+npm test            # 59 testes unitários (Vitest, fakes in-memory) em serviços + frontend
 npm run test:e2e    # 9 cenários ponta a ponta contra a stack em execução
-npm run test:chaos  # teste de caos de expiração de reservas (requer TTL curto)
+npm run test:chaos  # dois testes de caos: reserva presa e confirmação perdida (requer TTL curto)
 ```
 
 Os cenários E2E ([`scripts/e2e-saga.ts`](./scripts/e2e-saga.ts)) passam só pelo gateway e

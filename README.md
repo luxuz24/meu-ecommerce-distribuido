@@ -97,6 +97,7 @@ The full sequence diagram is in [docs/01](./docs/01-visao-e-arquitetura.md#a-sag
 | Two orders competing for the same item | `UPDATE … WHERE available_qty >= qty` + `CHECK (available_qty >= 0)` | E2E: 12 simultaneous orders for 4 units → exactly 4 paid |
 | Failure in the middle of the Saga | Compensation: `payment_failed` releases the reservation | E2E |
 | A step that never answers | Reservation expiry with a conditional sweeper | Chaos test in CI |
+| Lost confirmation of a paid order | Expiry of a `PAID` order replays `ORDER_CONFIRMED`; inventory re-acquires the stock | Chaos test in CI |
 | Client tampering with prices | Prices resolved in `catalog-service`; client values are discarded | Unit + E2E |
 | Broker outage | Reconnection with backoff (1 s → 30 s), topology re-declared, `/health` returns `503` while degraded | Chaos test |
 | Poison messages | Dead-letter exchange + one `*_dlq` per queue | — |
@@ -176,9 +177,10 @@ RESERVATION_TTL_SECONDS=15 RESERVATION_SWEEP_INTERVAL_MS=2000 docker compose up 
 npm run test:chaos
 ```
 
-The script makes `payment-service`'s database fail so the payment message is
-dead-lettered. The reservation expires, stock returns and the order ends
-`CANCELLED (RESERVATION_EXPIRED)`.
+The first script makes `payment-service`'s database fail so the payment message is
+dead-lettered: the reservation expires, stock returns and the order ends
+`CANCELLED (RESERVATION_EXPIRED)`. The second simulates a paid order whose confirmation
+was lost: the reservation expires, but the order stays `PAID` and its units stay sold.
 
 ---
 
@@ -186,9 +188,9 @@ dead-lettered. The reservation expires, stock returns and the order ends
 
 ```bash
 npm run lint        # ESLint + typescript-eslint over services, frontend and scripts
-npm test            # 58 unit tests (Vitest, in-memory fakes) across services + frontend
+npm test            # 59 unit tests (Vitest, in-memory fakes) across services + frontend
 npm run test:e2e    # 9 end-to-end scenarios against the running stack
-npm run test:chaos  # reservation-expiry chaos test (needs a short TTL)
+npm run test:chaos  # two chaos tests: stuck reservation and lost confirmation (need a short TTL)
 ```
 
 End-to-end scenarios ([`scripts/e2e-saga.ts`](./scripts/e2e-saga.ts)) go only through the

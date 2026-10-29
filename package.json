@@ -25,7 +25,7 @@
     "build": "npm run build:user && npm run build:catalog && npm run build:inventory && npm run build:order && npm run build:payment && npm run build:outbox && npm run build:notification && npm run build:frontend",
     "seed:demo": "npx --yes tsx scripts/seed-demo.ts",
     "test:e2e": "npx --yes tsx scripts/e2e-saga.ts",
-    "test:chaos": "bash scripts/chaos/reservation-expiry.sh",
+    "test:chaos": "bash scripts/chaos/reservation-expiry.sh && bash scripts/chaos/lost-confirmation.sh",
     "lint": "eslint services/*/src frontend/src scripts"
   },
   "devDependencies": {

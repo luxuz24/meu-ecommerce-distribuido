@@ -208,7 +208,7 @@ describe('Order Service Use Cases & Saga State Machine', () => {
     expect(repo.outboxEvents.at(-1)?.eventType).toBe('ORDER_CANCELLED');
   });
 
-  it('should keep a PAID order paid if the reservation expiry arrives late', async () => {
+  it('should keep a PAID order paid and replay ORDER_CONFIRMED if its reservation expired', async () => {
     const created = await createOrderUseCase.execute({
       userId: 'u',
       items: [{ productId: 'p1', quantity: 1 }],
@@ -219,8 +219,14 @@ describe('Order Service Use Cases & Saga State Machine', () => {
     const after = await updateOrderStatusUseCase.execute({
       orderId: created.id,
       eventType: 'RESERVATION_EXPIRED',
+      messageId: 'expired-msg-1',
     });
+
     expect(after?.status).toBe('PAID');
+    expect(repo.outboxEvents.at(-1)).toMatchObject({
+      eventType: 'ORDER_CONFIRMED',
+      payload: { orderId: created.id, replay: true },
+    });
   });
 
   it('should never move a CANCELLED order to PAID', async () => {
