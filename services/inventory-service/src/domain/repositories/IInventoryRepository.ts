@@ -8,6 +8,8 @@ export interface UpsertStockData {
 }
 
 export interface ReserveOrderInput {
+  /** Prazo da reserva; definido pelo use case a partir do TTL configurado */
+  expiresAt?: Date;
   messageId?: string;
   orderId: string;
   userId?: string;
@@ -31,4 +33,6 @@ export interface IInventoryRepository {
   reserveOrderStockWithOutbox(input: ReserveOrderInput): Promise<ReserveOrderResult>;
   releaseOrderReservationWithOutbox(orderId: string, messageId?: string): Promise<boolean>;
   confirmOrderReservation(orderId: string, messageId?: string): Promise<boolean>;
+  findExpiredReservationOrderIds(now: Date, limit: number): Promise<string[]>;
+  expireReservation(orderId: string, now: Date): Promise<boolean>;
 }

@@ -254,6 +254,27 @@ scenario('Concorrência: 12 pedidos simultâneos por 4 unidades não geram overs
   assert.deepEqual(await stockOf(product.sku), { availableQty: 0, reservedQty: 0 });
 });
 
+scenario('Catálogo: cadastros simultâneos do mesmo SKU geram 1 criação e 409 nos demais', async () => {
+  const sku = `E2E-${RUN_ID}-DUP`;
+  const attempts = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      call<{ id?: string }>('POST', '/api/products', {
+        token: adminToken,
+        body: { name: `Produto ${sku}`, description: 'Corrida de SKU', sku, price: 1, stock: 1 },
+      })
+    )
+  );
+  const created = attempts.filter((r) => r.status === 201);
+  created.forEach((r) => r.data.id && createdProductIds.push(r.data.id));
+
+  assert.equal(created.length, 1, 'exatamente uma criação deve vencer');
+  assert.deepEqual(
+    [...new Set(attempts.filter((r) => r.status !== 201).map((r) => r.status))],
+    [409],
+    'as demais devem ser 409 Conflict (nunca 500)'
+  );
+});
+
 scenario('Rastreabilidade: o X-Correlation-ID do cliente atravessa o gateway', async () => {
   const product = await newProduct(adminToken, 15, 2);
   const correlationId = `e2e-${randomUUID()}`;

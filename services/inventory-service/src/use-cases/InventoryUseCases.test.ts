@@ -12,6 +12,7 @@ import { UpsertStockUseCase } from './UpsertStockUseCase.js';
 import { GetStockBySkuUseCase } from './GetStockBySkuUseCase.js';
 import { ReserveStockUseCase } from './ReserveStockUseCase.js';
 import { ConfirmStockUseCase } from './ConfirmStockUseCase.js';
+import { ExpireReservationsUseCase } from './ExpireReservationsUseCase.js';
 import { ReleaseStockUseCase } from './ReleaseStockUseCase.js';
 import { verifyTokenHeader } from '../infra/http/middlewares/AuthMiddleware.js';
 import jwt from 'jsonwebtoken';
@@ -20,6 +21,7 @@ class InMemoryInventoryRepository implements IInventoryRepository {
   private items = new Map<string, InventoryItem>();
   private reservations = new Map<string, StockReservation>();
   private processedMessages = new Set<string>();
+  private expirations = new Map<string, Date>();
   public outboxEvents: Array<{ eventType: string; payload: unknown }> = [];
 
   async findBySku(sku: string): Promise<InventoryItem | null> {
@@ -96,6 +98,7 @@ class InMemoryInventoryRepository implements IInventoryRepository {
       items: input.items,
     });
     this.reservations.set(input.orderId, reservation);
+    if (input.expiresAt) this.expirations.set(input.orderId, input.expiresAt);
     if (input.messageId) this.processedMessages.add(input.messageId);
 
     this.outboxEvents.push({
@@ -108,6 +111,44 @@ class InMemoryInventoryRepository implements IInventoryRepository {
       orderId: input.orderId,
       reservation,
     };
+  }
+
+  async findExpiredReservationOrderIds(now: Date, limit: number): Promise<string[]> {
+    return Array.from(this.reservations.values())
+      .filter((r) => r.status === 'RESERVED' && (this.expirations.get(r.orderId)?.getTime() ?? Infinity) <= now.getTime())
+      .slice(0, limit)
+      .map((r) => r.orderId);
+  }
+
+  async expireReservation(orderId: string, now: Date): Promise<boolean> {
+    const existing = this.reservations.get(orderId);
+    const due = this.expirations.get(orderId);
+    if (!existing || existing.status !== 'RESERVED' || !due || due.getTime() > now.getTime()) return false;
+
+    for (const item of existing.items) {
+      const current = this.items.get(item.sku);
+      if (current) {
+        this.items.set(
+          item.sku,
+          new InventoryItem({
+            id: current.id,
+            productId: current.productId,
+            sku: current.sku,
+            availableQty: current.availableQty + item.quantity,
+            reservedQty: current.reservedQty - item.quantity,
+          })
+        );
+      }
+    }
+    this.reservations.set(
+      orderId,
+      new StockReservation({ id: existing.id, orderId, status: 'EXPIRED', items: existing.items })
+    );
+    this.outboxEvents.push({
+      eventType: 'STOCK_RESERVATION_EXPIRED',
+      payload: { orderId, reason: 'RESERVATION_EXPIRED', items: existing.items },
+    });
+    return true;
   }
 
   async confirmOrderReservation(orderId: string, messageId?: string): Promise<boolean> {
@@ -318,6 +359,43 @@ describe('Inventory Service Use Cases & Saga Stock Reservation', () => {
     const stock = await getBySkuUseCase.execute('SKU-OK');
     expect(stock.availableQty).toBe(6);
     expect(stock.reservedQty).toBe(0);
+  });
+
+  it('should expire a stale reservation, return the stock and emit STOCK_RESERVATION_EXPIRED', async () => {
+    let clock = new Date('2026-10-29T10:00:00Z');
+    const now = () => clock;
+    const reserve = new ReserveStockUseCase(repo, 60_000, now);
+    const expire = new ExpireReservationsUseCase(repo, now);
+    await upsertUseCase.execute({ productId: 'p1', sku: 'SKU-TTL', availableQty: 10 });
+    await reserve.execute({ orderId: 'o-stuck', items: [{ sku: 'SKU-TTL', quantity: 3 }] });
+
+    clock = new Date('2026-10-29T10:00:59Z');
+    expect(await expire.execute()).toEqual([]);
+
+    clock = new Date('2026-10-29T10:01:00Z');
+    expect(await expire.execute()).toEqual(['o-stuck']);
+    expect(await expire.execute()).toEqual([]);
+
+    const stock = await getBySkuUseCase.execute('SKU-TTL');
+    expect(stock.availableQty).toBe(10);
+    expect(stock.reservedQty).toBe(0);
+    expect(repo.outboxEvents.at(-1)).toMatchObject({
+      eventType: 'STOCK_RESERVATION_EXPIRED',
+      payload: { orderId: 'o-stuck', reason: 'RESERVATION_EXPIRED' },
+    });
+  });
+
+  it('should never expire a reservation that was already confirmed', async () => {
+    let clock = new Date('2026-10-29T10:00:00Z');
+    const now = () => clock;
+    const reserve = new ReserveStockUseCase(repo, 60_000, now);
+    await upsertUseCase.execute({ productId: 'p1', sku: 'SKU-PAID', availableQty: 5 });
+    await reserve.execute({ orderId: 'o-paid-ttl', items: [{ sku: 'SKU-PAID', quantity: 2 }] });
+    await new ConfirmStockUseCase(repo).execute('o-paid-ttl', 'confirm-1');
+
+    clock = new Date('2026-10-29T11:00:00Z');
+    expect(await new ExpireReservationsUseCase(repo, now).execute()).toEqual([]);
+    expect((await getBySkuUseCase.execute('SKU-PAID')).availableQty).toBe(3);
   });
 
   it('should validate HS256 JWT token for Admin inventory seeding', () => {

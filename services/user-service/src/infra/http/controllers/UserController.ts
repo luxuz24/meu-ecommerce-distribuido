@@ -4,6 +4,7 @@ import { authMiddleware } from "../middlewares/AuthMiddleware.js";
 import { UserAlreadyExistsError } from "../../../domain/errors/UserAlreadyExistsError.js";
 import { InvalidCredentialsError } from "../../../domain/errors/InvalidCredentialsError.js";
 import { UserNotFoundError } from "../../../domain/errors/UserNotFoundError.js";
+import type { LoginUserDTO } from "../../../use-cases/LoginUseCase.js";
 
 export async function userRoutes(app: FastifyInstance) {
   
@@ -41,12 +42,12 @@ export async function userRoutes(app: FastifyInstance) {
       },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { name, email, password } = request.body as any;
+      const { name, email, password } = request.body as { name: string; email: string; password: string };
       try {
         // Cadastro público nunca escolhe papel: privilégio ADMIN só via bootstrap do servidor
         const user = await createUserUseCase.execute(name, email, password, 'CUSTOMER');
         return reply.status(201).send(user);
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof UserAlreadyExistsError) {
           return reply.status(400).send({ error: error.message });
         }
@@ -79,10 +80,10 @@ export async function userRoutes(app: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const data = request.body as any;
+        const data = request.body as LoginUserDTO;
         const result = await loginUserUseCase.execute(data);
         return reply.status(200).send(result);
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof InvalidCredentialsError) {
           return reply.status(401).send({ error: error.message });
         }
@@ -95,11 +96,13 @@ export async function userRoutes(app: FastifyInstance) {
 
   app.get('/users/me', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const userDataFromToken = (request as any).user;
-      const freshUserData = await getUserProfileUseCase.execute(userDataFromToken.userId);
+      if (!request.user) {
+        return reply.status(401).send({ error: 'Token not provided' });
+      }
+      const freshUserData = await getUserProfileUseCase.execute(request.user.userId);
 
       return reply.status(200).send(freshUserData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof UserNotFoundError) {
         return reply.status(404).send({ error: error.message });
       }

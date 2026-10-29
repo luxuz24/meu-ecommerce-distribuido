@@ -4,8 +4,14 @@ import {
   type ReserveOrderResult,
 } from '../domain/repositories/IInventoryRepository.js';
 
+export const DEFAULT_RESERVATION_TTL_MS = 15 * 60 * 1000;
+
 export class ReserveStockUseCase {
-  constructor(private readonly inventoryRepository: IInventoryRepository) {}
+  constructor(
+    private readonly inventoryRepository: IInventoryRepository,
+    private readonly reservationTtlMs: number = DEFAULT_RESERVATION_TTL_MS,
+    private readonly now: () => Date = () => new Date()
+  ) {}
 
   async execute(input: ReserveOrderInput): Promise<ReserveOrderResult> {
     if (!input.orderId || input.items.length === 0) {
@@ -27,6 +33,7 @@ export class ReserveStockUseCase {
     }
 
     return this.inventoryRepository.reserveOrderStockWithOutbox({
+      expiresAt: new Date(this.now().getTime() + this.reservationTtlMs),
       ...(input.messageId !== undefined ? { messageId: input.messageId } : {}),
       orderId: input.orderId,
       ...(input.userId !== undefined ? { userId: input.userId } : {}),

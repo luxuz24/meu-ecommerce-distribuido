@@ -11,7 +11,7 @@ Documento **normativo**. Complementa `03-convencoes-de-codigo.md`. Em conflito, 
 2. Partir sempre da `main` atualizada: `git switch main && git pull && git switch -c feat/...`.
 3. Commits pequenos em **Conventional Commits** (`feat(catalog-service): add list products`).
 4. Escrever/atualizar **testes junto** com o código (ver seção 5).
-5. Antes de abrir o PR, rodar localmente no(s) serviço(s) alterado(s): `npm run lint`, `npm run build`, `npm test`. Se algo falhar, corrigir — nunca desabilitar teste, lint ou regra para passar.
+5. Antes de abrir o PR, rodar localmente: `npm run lint` (raiz), `npm run build` e `npm test`; para mudanças na Saga, também `npm run test:e2e` e `npm run test:chaos` com a stack no ar. Se algo falhar, corrigir — nunca desabilitar teste, lint ou regra para passar.
 6. **Abrir o Pull Request** com resumo da mudança e evidência dos testes. Nenhum PR é mergeado sem revisão e CI verde.
 7. **Merge só se o CI estiver verde** (todos os checks obrigatórios). PR com teste falhando ou sem teste do novo comportamento não é mergeado.
 8. Um escopo por PR. Atualizar docs (`02-planejamento-roadmap.md`, `04-contratos-api-e-eventos.md`) no mesmo PR.
@@ -33,11 +33,15 @@ Documento **normativo**. Complementa `03-convencoes-de-codigo.md`. Em conflito, 
 
 ### Proteção da `main` (configurar no GitHub — ação do usuário)
 - Exigir PR + 1 aprovação; bloquear push direto e force-push.
-- Exigir status checks: `lint`, `build`, `test`, `docker-build`, `audit`.
+- Exigir os status checks do workflow `CI`: `Lint`, `Build & Test (<serviço>)` (inclui `npm audit`), `Build & Test (frontend)` e `E2E Saga (docker compose)`.
 - Exigir branch atualizada com a `main` antes do merge.
 
-### CI mínimo (`.github/workflows/ci.yml`) — tarefa da Fase 0
-Matriz por serviço: `npm ci` → `lint` → `tsc` → `test` (com Postgres/Mongo/RabbitMQ como `services:` para integração) → `npm audit --audit-level=high` → `docker build`. Falha em qualquer etapa bloqueia o merge.
+### CI (`.github/workflows/ci.yml`)
+1. **Lint**: ESLint + typescript-eslint sobre serviços, frontend e scripts (configuração única na raiz).
+2. **Build & Test** (matriz por serviço + frontend): `npm ci` → `tsc` → testes unitários → `npm audit --omit=dev --audit-level=high`.
+3. **E2E Saga**: sobe a stack do zero com `docker compose up --wait`, roda o seed, a suíte E2E e o teste de caos de expiração de reservas; anexa logs em caso de falha.
+
+Falha em qualquer etapa bloqueia o merge.
 
 ---
 
@@ -120,7 +124,7 @@ await app.register(cors, {
 - Scan de segredos no CI (ex.: gitleaks).
 
 ### 3.9 Dependências e containers
-- `npm audit --audit-level=high` e Dependabot/Renovate; PR com vulnerabilidade alta/crítica não faz merge.
+- `npm audit --omit=dev --audit-level=high` em cada serviço no CI; PR com vulnerabilidade alta/crítica em dependência de produção não faz merge. (Dependabot/Renovate: recomendado, ainda não configurado.)
 - `npm ci` (lockfile), versões fixadas; imagens base com tag/digest específico.
 - Containers: rodar como **usuário não-root** (`USER node`), filesystem somente leitura quando possível, sem `--privileged`, healthcheck em todos.
 - Scan de imagem no CI (ex.: Trivy).
@@ -153,22 +157,22 @@ await app.register(cors, {
 
 - **Ferramenta**: Vitest (unit + integração), Supertest/`fastify.inject` para HTTP, Testing Library/Playwright no frontend.
 - **Pirâmide**:
-  - *Unit*: use cases com fakes in-memory das interfaces (rápidos, sem rede). Meta de cobertura ≥ **80%** em `use-cases/` e `domain/`.
-  - *Integração*: repositórios e rotas contra Postgres/Mongo/RabbitMQ reais (containers do CI) — inclui outbox → fila → consumidor.
+  - *Unit*: use cases com fakes in-memory das interfaces (rápidos, sem rede). Cobertura ainda não é medida no CI — próximo passo é publicar o relatório do Vitest.
+  - *Integração/E2E*: hoje feitos pela stack completa do Compose (`scripts/e2e-saga.ts`), que exercita gateway → serviços → Postgres/Mongo → outbox → RabbitMQ → consumidores. Concorrência e idempotência só são consideradas provadas contra infraestrutura real, nunca com fakes.
   - *Segurança*: injeção, CORS (origem não permitida → bloqueada), rate limit (excedido → 429), auth (sem/ inválido token → 401, role errada → 403).
-  - *E2E* (quando o frontend existir): fluxo cadastro → login → catálogo → pedido.
+  - *Caos*: `scripts/chaos/reservation-expiry.sh` injeta falha no banco do pagamento e verifica que a reserva expira e o estoque volta.
 - **Regras**:
   - Bug corrigido ⇒ teste de regressão que falha antes e passa depois.
   - Feature nova ⇒ testes do caminho feliz, erros e limites.
   - Testes determinísticos (sem dependência de horário/rede externa/ordem).
   - Proibido `.skip`/`.only`/reduzir cobertura para fazer o CI passar.
-- **Gate**: PR só é elegível a merge com **todos os checks verdes** (lint, build, test, audit, docker-build) e aprovação do usuário.
+- **Gate**: PR só é elegível a merge com **todos os checks verdes** (lint, build/test/audit por serviço, E2E) e revisão aprovada.
 
 ---
 
 ## 6. Resumo do ciclo de uma tarefa
 ```
 main atualizada → git switch -c feat/x → implementar (SOLID + segurança) → testes
-→ lint/build/test locais → push → abrir PR (template) → devolver link ao usuário
-→ CI verde + aprovação do usuário → merge (squash) → atualizar roadmap
+→ lint/build/test locais → push → abrir PR (template)
+→ CI verde + revisão aprovada → merge → atualizar roadmap
 ```

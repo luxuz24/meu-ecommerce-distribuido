@@ -55,7 +55,7 @@ describe('CreateUserUseCase', () => {
     expect(result.name).toBe('Lucas Ortiz');
     expect(result.email).toBe('lucas@example.com');
     expect(result.role).toBe('CUSTOMER');
-    expect((result as any).password).toBeUndefined();
+    expect(result).not.toHaveProperty('password');
 
     expect(userRepository.users).toHaveLength(1);
     expect(userRepository.outboxEvents).toHaveLength(1);

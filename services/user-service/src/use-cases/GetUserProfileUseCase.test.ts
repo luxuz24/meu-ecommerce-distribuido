@@ -50,7 +50,7 @@ describe('GetUserProfileUseCase', () => {
       email: 'joao@example.com',
       role: 'ADMIN',
     });
-    expect((result as any).password).toBeUndefined();
+    expect(result).not.toHaveProperty('password');
   });
 
   it('should throw UserNotFoundError when user does not exist', async () => {

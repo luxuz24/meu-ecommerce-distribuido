@@ -62,6 +62,20 @@ export function parseNotificationEvent(
   return null;
 }
 
+/**
+ * Eventos reemitidos para reconciliação entre serviços (ex.: ORDER_CONFIRMED de um pedido
+ * pago cuja reserva expirou) não devem gerar uma segunda notificação ao cliente.
+ */
+export function isReplayEvent(rawMessage: string): boolean {
+  try {
+    const eventData = JSON.parse(rawMessage);
+    const data = typeof eventData.payload === 'string' ? JSON.parse(eventData.payload) : (eventData.payload ?? eventData);
+    return data?.replay === true;
+  } catch {
+    return false;
+  }
+}
+
 export const EXCHANGE_NAME = 'ecommerce_events';
 export const DLX_EXCHANGE_NAME = 'ecommerce_events_dlx';
 export const QUEUE_NAME = 'notification_events_queue';
@@ -111,6 +125,11 @@ function startConsumer(): void {
         try {
           const routingKey = message.fields.routingKey || 'user_created';
           const rawMessage = message.content.toString();
+          if (isReplayEvent(rawMessage)) {
+            console.log(`Replay of ${routingKey} acknowledged without notifying the customer`);
+            channel.ack(message);
+            return;
+          }
           const action = parseNotificationEvent(routingKey, rawMessage);
 
           if (!action) {

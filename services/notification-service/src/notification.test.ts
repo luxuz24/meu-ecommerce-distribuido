@@ -3,6 +3,7 @@ import {
   buildNotificationQueueArguments,
   DLQ_QUEUE_NAME,
   DLX_EXCHANGE_NAME,
+  isReplayEvent,
   parseNotificationEvent,
 } from './index.js';
 
@@ -66,5 +67,11 @@ describe('Notification payload parser (User & Saga Order/Payment events)', () =>
       'x-dead-letter-exchange': DLX_EXCHANGE_NAME,
       'x-dead-letter-routing-key': DLQ_QUEUE_NAME,
     });
+  });
+
+  it('should recognize replayed events so the customer is not notified twice', () => {
+    expect(isReplayEvent(JSON.stringify({ orderId: 'o1', total: 10, replay: true }))).toBe(true);
+    expect(isReplayEvent(JSON.stringify({ orderId: 'o1', total: 10 }))).toBe(false);
+    expect(isReplayEvent('not-json')).toBe(false);
   });
 });

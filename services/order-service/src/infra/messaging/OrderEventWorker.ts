@@ -18,6 +18,7 @@ const ROUTING_KEY_TO_EVENT: Record<string, OrderSagaEventType> = {
   stock_rejected: 'STOCK_REJECTED',
   payment_approved: 'PAYMENT_APPROVED',
   payment_failed: 'PAYMENT_FAILED',
+  stock_reservation_expired: 'RESERVATION_EXPIRED',
 };
 
 /** Restaura o X-Correlation-ID da mensagem e registra a passagem do evento por este serviço. */
