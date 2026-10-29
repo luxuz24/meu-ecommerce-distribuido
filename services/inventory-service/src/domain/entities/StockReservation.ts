@@ -1,4 +1,4 @@
-export type ReservationStatus = 'RESERVED' | 'RELEASED' | 'CONFIRMED';
+export type ReservationStatus = 'RESERVED' | 'RELEASED' | 'CONFIRMED' | 'EXPIRED';
 
 export interface ReservationItemEntry {
   sku: string;

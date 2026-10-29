@@ -23,7 +23,11 @@ model StockReservation {
   status    String   @default("RESERVED")
   items     Json
   createdAt DateTime @default(now())
+  // Prazo para a Saga concluir; vencido, o sweeper estorna a reserva e cancela o pedido
+  expiresAt     DateTime?
+  correlationId String?
 
+  @@index([status, expiresAt])
   @@map("stock_reservations")
 }
 

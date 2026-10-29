@@ -5,7 +5,8 @@ export type OrderSagaEventType =
   | 'STOCK_RESERVED'
   | 'STOCK_REJECTED'
   | 'PAYMENT_APPROVED'
-  | 'PAYMENT_FAILED';
+  | 'PAYMENT_FAILED'
+  | 'RESERVATION_EXPIRED';
 
 export interface HandleOrderSagaEventInput {
   eventType: OrderSagaEventType;
@@ -85,6 +86,27 @@ export class UpdateOrderStatusUseCase {
         cancelReason: reason,
         ...(input.messageId !== undefined ? { messageId: input.messageId } : {}),
         sourceEvent: 'PAYMENT_FAILED',
+        outboxEvent: {
+          eventType: 'ORDER_CANCELLED',
+          payload: {
+            orderId: existing.id,
+            userId: existing.userId,
+            reason,
+          },
+        },
+      });
+    }
+
+    if (input.eventType === 'RESERVATION_EXPIRED') {
+      // Pedido já pago vence a corrida: o inventory readquire o estoque na confirmação
+      if (existing.status !== 'PENDING' && existing.status !== 'STOCK_RESERVED') return existing;
+      const reason = input.reason ?? 'RESERVATION_EXPIRED';
+      return this.orderRepository.updateStatusWithOutbox({
+        orderId: input.orderId,
+        status: 'CANCELLED',
+        cancelReason: reason,
+        ...(input.messageId !== undefined ? { messageId: input.messageId } : {}),
+        sourceEvent: 'RESERVATION_EXPIRED',
         outboxEvent: {
           eventType: 'ORDER_CANCELLED',
           payload: {

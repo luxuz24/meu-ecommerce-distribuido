@@ -190,6 +190,39 @@ describe('Order Service Use Cases & Saga State Machine', () => {
     expect(repo.lastCreateData?.simulateOutcome).toBe('FAILED');
   });
 
+  it('should cancel an unpaid order when its stock reservation expires', async () => {
+    const created = await createOrderUseCase.execute({
+      userId: 'u',
+      items: [{ productId: 'p1', quantity: 1 }],
+    });
+    await updateOrderStatusUseCase.execute({ orderId: created.id, eventType: 'STOCK_RESERVED' });
+
+    const expired = await updateOrderStatusUseCase.execute({
+      orderId: created.id,
+      eventType: 'RESERVATION_EXPIRED',
+      reason: 'RESERVATION_EXPIRED',
+    });
+
+    expect(expired?.status).toBe('CANCELLED');
+    expect(expired?.cancelReason).toBe('RESERVATION_EXPIRED');
+    expect(repo.outboxEvents.at(-1)?.eventType).toBe('ORDER_CANCELLED');
+  });
+
+  it('should keep a PAID order paid if the reservation expiry arrives late', async () => {
+    const created = await createOrderUseCase.execute({
+      userId: 'u',
+      items: [{ productId: 'p1', quantity: 1 }],
+    });
+    await updateOrderStatusUseCase.execute({ orderId: created.id, eventType: 'STOCK_RESERVED' });
+    await updateOrderStatusUseCase.execute({ orderId: created.id, eventType: 'PAYMENT_APPROVED' });
+
+    const after = await updateOrderStatusUseCase.execute({
+      orderId: created.id,
+      eventType: 'RESERVATION_EXPIRED',
+    });
+    expect(after?.status).toBe('PAID');
+  });
+
   it('should never move a CANCELLED order to PAID', async () => {
     const created = await createOrderUseCase.execute({
       userId: 'u',

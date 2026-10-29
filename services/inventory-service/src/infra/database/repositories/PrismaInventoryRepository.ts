@@ -96,6 +96,8 @@ export class PrismaInventoryRepository implements IInventoryRepository {
             orderId: input.orderId,
             status: 'RESERVED',
             items: input.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
+            expiresAt: input.expiresAt ?? null,
+            correlationId: currentCorrelationId(),
           },
         });
 
@@ -258,15 +260,33 @@ export class PrismaInventoryRepository implements IInventoryRepository {
           where: { orderId, status: 'RESERVED' },
           data: { status: 'CONFIRMED' },
         });
-        if (count === 0) return false;
 
-        const reservation = await tx.stockReservation.findUniqueOrThrow({ where: { orderId } });
-        const items = reservation.items as unknown as ReservationItemEntry[];
-        for (const item of items) {
-          await tx.inventoryItem.update({
-            where: { sku: item.sku },
-            data: { reservedQty: { decrement: item.quantity } },
+        if (count === 0) {
+          // Pagamento aprovado depois que a reserva expirou: o estoque já voltou para
+          // availableQty, então tentamos readquiri-lo com o mesmo update condicional.
+          const lateConfirm = await tx.stockReservation.updateMany({
+            where: { orderId, status: 'EXPIRED' },
+            data: { status: 'CONFIRMED' },
           });
+          if (lateConfirm.count === 0) return false;
+
+          const expired = await tx.stockReservation.findUniqueOrThrow({ where: { orderId } });
+          for (const item of expired.items as unknown as ReservationItemEntry[]) {
+            const { count: taken } = await tx.inventoryItem.updateMany({
+              where: { sku: item.sku, availableQty: { gte: item.quantity } },
+              data: { availableQty: { decrement: item.quantity } },
+            });
+            if (taken === 0) throw new LateConfirmationShortage(orderId, item.sku);
+          }
+        } else {
+          const reservation = await tx.stockReservation.findUniqueOrThrow({ where: { orderId } });
+          const items = reservation.items as unknown as ReservationItemEntry[];
+          for (const item of items) {
+            await tx.inventoryItem.update({
+              where: { sku: item.sku },
+              data: { reservedQty: { decrement: item.quantity } },
+            });
+          }
         }
 
         if (messageId) {
@@ -279,8 +299,69 @@ export class PrismaInventoryRepository implements IInventoryRepository {
       });
     } catch (err) {
       if (isUniqueViolation(err)) return false;
+      if (err instanceof LateConfirmationShortage) {
+        // Pedido pago sem estoque disponível: exige intervenção (estorno ao cliente)
+        console.error(`[inventory-service] ${err.message}`);
+        return false;
+      }
       throw err;
     }
+  }
+
+  async findExpiredReservationOrderIds(now: Date, limit: number): Promise<string[]> {
+    const rows = await this.prisma.stockReservation.findMany({
+      where: { status: 'RESERVED', expiresAt: { lte: now } },
+      orderBy: { expiresAt: 'asc' },
+      take: limit,
+      select: { orderId: true },
+    });
+    return rows.map((r) => r.orderId);
+  }
+
+  async expireReservation(orderId: string, now: Date): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // Só expira quem ainda está RESERVED e vencido: confirmação/estorno concorrente vence
+      const { count } = await tx.stockReservation.updateMany({
+        where: { orderId, status: 'RESERVED', expiresAt: { lte: now } },
+        data: { status: 'EXPIRED' },
+      });
+      if (count === 0) return false;
+
+      const reservation = await tx.stockReservation.findUniqueOrThrow({ where: { orderId } });
+      const items = reservation.items as unknown as ReservationItemEntry[];
+      for (const item of items) {
+        await tx.inventoryItem.update({
+          where: { sku: item.sku },
+          data: {
+            availableQty: { increment: item.quantity },
+            reservedQty: { decrement: item.quantity },
+          },
+        });
+      }
+
+      await tx.outbox.create({
+        data: {
+          // Mantém a trilha da requisição que originou a reserva
+          correlationId: reservation.correlationId,
+          aggregateType: 'Inventory',
+          aggregateId: orderId,
+          eventType: 'STOCK_RESERVATION_EXPIRED',
+          payload: {
+            orderId,
+            reason: 'RESERVATION_EXPIRED',
+            items: items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
+          },
+        },
+      });
+
+      return true;
+    });
+  }
+}
+
+class LateConfirmationShortage extends Error {
+  constructor(orderId: string, sku: string) {
+    super(`PAID_ORDER_WITHOUT_STOCK: order ${orderId} was paid after its reservation expired and ${sku} is no longer available`);
   }
 }
 

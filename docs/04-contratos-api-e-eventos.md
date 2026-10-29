@@ -27,7 +27,7 @@ A conta ADMIN é provisionada no boot do user-service a partir de `ADMIN_EMAIL`/
 |---|---|---|---|
 | GET | `/api/products` | — | `?page&limit&q&active` → `{items,total,page,limit,totalPages}` |
 | GET | `/api/products/:id` | — | → produto; 404 |
-| POST | `/api/products` | ADMIN | `{name,description,sku,price≥0,stock≥0}` → 201 |
+| POST | `/api/products` | ADMIN | `{name,description,sku,price≥0,stock≥0}` → 201; **409** se o SKU já existe (inclusive em cadastros simultâneos: o índice único decide) |
 | PATCH | `/api/products/:id` | ADMIN | atualização parcial |
 | DELETE | `/api/products/:id` | ADMIN | soft delete (`isActive=false`) → 204 |
 
@@ -46,7 +46,7 @@ A conta ADMIN é provisionada no boot do user-service a partir de `ADMIN_EMAIL`/
 | POST | `/api/orders` | usuário | `{items:[{productId, quantity}], simulatePaymentFailure?: boolean}` → 201 pedido `PENDING`. **Preço, nome e SKU vêm do catalog-service**; campos extras enviados pelo cliente são descartados. 422 produto inexistente/inativo · 503 catálogo indisponível |
 | GET | `/api/orders` | usuário | pedidos do usuário `{items,total}` |
 | GET | `/api/orders/:id` | dono ou ADMIN | 403 para outro cliente (anti-IDOR) |
-| PATCH | `/api/orders/:id/saga-event` | ADMIN | transição manual para operação/diagnóstico |
+| PATCH | `/api/orders/:id/saga-event` | ADMIN | transição manual para operação/diagnóstico (inclui `RESERVATION_EXPIRED`) |
 
 ## payment-service
 | Método | Rota | Auth | Descrição |
@@ -55,6 +55,9 @@ A conta ADMIN é provisionada no boot do user-service a partir de `ADMIN_EMAIL`/
 | POST | `/api/payments/process` | ADMIN | processamento manual; o fluxo normal é o evento `stock_reserved` |
 
 Regra antifraude: pagamentos acima de **R$ 50.000** são recusados.
+
+## Prazo das reservas
+Toda reserva nasce com `expiresAt = agora + RESERVATION_TTL_SECONDS` (padrão 900s). Um sweeper no inventory-service (`RESERVATION_SWEEP_INTERVAL_MS`, padrão 15s) expira reservas `RESERVED` vencidas com transição condicional, devolve o estoque e publica `stock_reservation_expired`; o order-service cancela o pedido se ele ainda não foi pago. Se a aprovação do pagamento chegar depois da expiração, o inventory tenta readquirir o estoque com o mesmo update condicional.
 
 ## Eventos — exchange `ecommerce_events` (topic, durable)
 
@@ -69,6 +72,7 @@ Propriedades AMQP de toda mensagem publicada pela outbox: `messageId` = id da li
 | STOCK_RESERVED | `stock_reserved` | inventory | order, payment | `{orderId,reservationId,userId,total,simulateOutcome?,items}` |
 | STOCK_REJECTED | `stock_rejected` | inventory | order | `{orderId,reason,items}` — `reason`: `INSUFFICIENT_STOCK:<sku>` ou `SKU_NOT_FOUND:<sku>` |
 | STOCK_RELEASED | `stock_released` | inventory | — (auditoria) | `{orderId,items}` |
+| STOCK_RESERVATION_EXPIRED | `stock_reservation_expired` | inventory (sweeper) | order | `{orderId,reason:"RESERVATION_EXPIRED",items}` — a reserva venceu sem a Saga concluir; o estoque já foi devolvido |
 | PAYMENT_APPROVED | `payment_approved` | payment | order | `{orderId,paymentId,userId,amount,status}` |
 | PAYMENT_FAILED | `payment_failed` | payment | order, inventory, notification | `{orderId,paymentId,userId,amount,status,reason}` |
 | ORDER_CONFIRMED | `order_confirmed` | order | inventory, notification | `{orderId,userId,total}` |

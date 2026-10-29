@@ -10,6 +10,8 @@ import {
   reserveStockUseCase,
   releaseStockUseCase,
   confirmStockUseCase,
+  expireReservationsUseCase,
+  reservationTtlMs,
 } from './infra/container.js';
 import { registerInventoryRoutes } from './infra/http/routes/inventoryRoutes.js';
 import { startInventoryMessaging } from './infra/messaging/InventoryEventWorker.js';
@@ -21,6 +23,30 @@ const app = Fastify({
   // limit por IP enxergaria só o Nginx e viraria um limite global para todos os usuários.
   trustProxy: 'loopback, uniquelocal',
 });
+
+const SWEEP_INTERVAL_MS = Number(process.env.RESERVATION_SWEEP_INTERVAL_MS) || 15_000;
+
+/** Varredura periódica de reservas vencidas, sem execuções sobrepostas. */
+function startReservationSweeper(): void {
+  let running = false;
+  setInterval(async () => {
+    if (running) return;
+    running = true;
+    try {
+      const expired = await expireReservationsUseCase.execute();
+      if (expired.length > 0) {
+        app.log.warn({ orderIds: expired }, `Expired ${expired.length} stale stock reservation(s)`);
+      }
+    } catch (err) {
+      app.log.error({ err }, 'Reservation sweeper failed');
+    } finally {
+      running = false;
+    }
+  }, SWEEP_INTERVAL_MS);
+  app.log.info(
+    `Reservation sweeper every ${SWEEP_INTERVAL_MS}ms (TTL ${Math.round(reservationTtlMs / 1000)}s)`
+  );
+}
 
 const start = async () => {
   try {
@@ -104,6 +130,8 @@ const start = async () => {
     const port = Number(process.env.PORT) || 3003;
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`Inventory service running on port ${port}`);
+
+    startReservationSweeper();
 
   } catch (err) {
     app.log.error(err);

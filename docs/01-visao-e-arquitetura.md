@@ -86,6 +86,7 @@ sequenceDiagram
 | Entrega *at-least-once* gera duplicatas | Tabela `processed_messages` + transições condicionais | consumers de inventory, order, payment | testes unitários + reentrega concorrente ao vivo |
 | Duas reservas disputando o mesmo saldo | `UPDATE … WHERE availableQty >= qty` + `CHECK (availableQty >= 0)` | inventory-service | E2E: 12 pedidos simultâneos por 4 unidades |
 | Falha no meio da Saga | Compensação: `payment_failed` estorna a reserva | inventory-service | E2E: cenário de pagamento recusado |
+| Etapa que nunca responde (ex.: mensagem do pagamento na DLQ) | Reserva com prazo (`expiresAt`) + sweeper com transição condicional → `stock_reservation_expired` cancela o pedido | inventory + order | Teste de caos no CI (`scripts/chaos/reservation-expiry.sh`) |
 | Cliente adulterando preço | Preço, nome e SKU resolvidos no catálogo | order-service | unitário + E2E |
 | Broker indisponível no boot ou em produção | Reconexão com backoff (1s→30s) e redeclaração da topologia | `ResilientRabbit.ts` em cada serviço | cold start sem reinícios; teste de caos |
 | Mensagem envenenada travando a fila | DLX `ecommerce_events_dlx` + filas `*_dlq` | todos os consumers | topologia declarada no código |
@@ -116,11 +117,14 @@ próprio); um pacote interno acoplaria as versões de todos. O custo é manter a
 
 **ADR-5 — Reserva de estoque antes do pagamento.** Reservar primeiro evita cobrar por algo
 indisponível; o custo é a reserva temporária, liberada na compensação ou convertida em baixa
-definitiva no `order_confirmed`.
+definitiva no `order_confirmed` — e, se nenhuma das duas chegar, expirada pelo sweeper após `RESERVATION_TTL_SECONDS`.
 
 ## Limitações conhecidas (fora do escopo deste estudo de caso)
-- Reservas não expiram: se um pagamento nunca responder, a reserva fica presa. Um job de
-  expiração (ou TTL na mensagem) resolveria.
+- Não há fluxo de estorno financeiro: se o pagamento for aprovado depois que a reserva expirou e
+  o estoque já foi vendido a outro cliente, o inventory registra `PAID_ORDER_WITHOUT_STOCK` para
+  intervenção manual em vez de emitir um reembolso automático.
+- Mensagens na DLQ não são reprocessadas automaticamente; a expiração de reservas limita o dano,
+  mas a reentrega exige ação operacional.
 - Não há tracing distribuído com spans (OpenTelemetry/Jaeger); a rastreabilidade é por
   correlation id em logs.
 - O JWT é validado em cada serviço com segredo compartilhado (HS256). Em produção, chaves

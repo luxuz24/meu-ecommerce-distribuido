@@ -102,6 +102,7 @@ export async function registerOrderRoutes(
                 'STOCK_REJECTED',
                 'PAYMENT_APPROVED',
                 'PAYMENT_FAILED',
+                'RESERVATION_EXPIRED',
               ],
             },
             reason: { type: 'string', maxLength: 250 },
