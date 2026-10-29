@@ -20,7 +20,8 @@ export function parseStockReservedEvent(
   // pedido "undefined" ou pagamento sem dono.
   const orderId = requiredText(payload.orderId, 'orderId');
   const userId = requiredText(payload.userId, 'userId');
-  if (typeof payload.total !== 'number' || !Number.isFinite(payload.total) || payload.total < 0) {
+  // Number.isFinite não converte tipos: recusa string, null, NaN e o Infinity que o JSON.parse gera para 1e400
+  if (!Number.isFinite(payload.total) || payload.total < 0) {
     throw new Error('INVALID_STOCK_RESERVED_EVENT: total must be a finite number >= 0');
   }
 

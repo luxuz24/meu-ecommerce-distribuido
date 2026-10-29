@@ -1,4 +1,4 @@
-import { type PrismaClient } from '@prisma/client';
+import { type Payment as PaymentRow, type PrismaClient } from '@prisma/client';
 import { currentCorrelationId } from '../../observability/correlation.js';
 import { Payment, type PaymentStatus } from '../../../domain/entities/Payment.js';
 import {
@@ -14,17 +14,7 @@ export class PrismaPaymentRepository implements IPaymentRepository {
     const raw = await this.prisma.payment.findUnique({
       where: { orderId },
     });
-    if (!raw) return null;
-
-    return new Payment({
-      id: raw.id,
-      orderId: raw.orderId,
-      userId: raw.userId,
-      amount: raw.amount,
-      status: raw.status as PaymentStatus,
-      failureReason: raw.failureReason,
-      createdAt: raw.createdAt,
-    });
+    return raw ? toDomain(raw) : null;
   }
 
   async processWithOutbox(data: ProcessPaymentData): Promise<ProcessPaymentResult> {
@@ -41,15 +31,7 @@ export class PrismaPaymentRepository implements IPaymentRepository {
             if (existing) {
               return {
                 event: 'ALREADY_PROCESSED',
-                payment: new Payment({
-                  id: existing.id,
-                  orderId: existing.orderId,
-                  userId: existing.userId,
-                  amount: existing.amount,
-                  status: existing.status as PaymentStatus,
-                  failureReason: existing.failureReason,
-                  createdAt: existing.createdAt,
-                }),
+                payment: toDomain(existing),
               };
             }
           }
@@ -61,15 +43,7 @@ export class PrismaPaymentRepository implements IPaymentRepository {
         if (decided) {
           return {
             event: 'ALREADY_PROCESSED',
-            payment: new Payment({
-              id: decided.id,
-              orderId: decided.orderId,
-              userId: decided.userId,
-              amount: decided.amount,
-              status: decided.status as PaymentStatus,
-              failureReason: decided.failureReason,
-              createdAt: decided.createdAt,
-            }),
+            payment: toDomain(decided),
           };
         }
 
@@ -87,7 +61,8 @@ export class PrismaPaymentRepository implements IPaymentRepository {
           await tx.processedMessage.create({
             data: {
               messageId: data.messageId,
-              eventType: 'STOCK_RESERVED',
+              // A mesma chave serve ao evento stock_reserved e à rota admin
+              eventType: 'PAYMENT_PROCESSING',
             },
           });
         }
@@ -114,15 +89,7 @@ export class PrismaPaymentRepository implements IPaymentRepository {
 
         return {
           event: eventType,
-          payment: new Payment({
-            id: created.id,
-            orderId: created.orderId,
-            userId: created.userId,
-            amount: created.amount,
-            status: created.status as PaymentStatus,
-            failureReason: created.failureReason,
-            createdAt: created.createdAt,
-          }),
+          payment: toDomain(created),
         };
       });
     } catch (err) {
@@ -133,19 +100,23 @@ export class PrismaPaymentRepository implements IPaymentRepository {
         if (winner) {
           return {
             event: 'ALREADY_PROCESSED',
-            payment: new Payment({
-              id: winner.id,
-              orderId: winner.orderId,
-              userId: winner.userId,
-              amount: winner.amount,
-              status: winner.status as PaymentStatus,
-              failureReason: winner.failureReason,
-              createdAt: winner.createdAt,
-            }),
+            payment: toDomain(winner),
           };
         }
       }
       throw err;
     }
   }
+}
+
+function toDomain(row: PaymentRow): Payment {
+  return new Payment({
+    id: row.id,
+    orderId: row.orderId,
+    userId: row.userId,
+    amount: row.amount,
+    status: row.status as PaymentStatus,
+    failureReason: row.failureReason,
+    createdAt: row.createdAt,
+  });
 }

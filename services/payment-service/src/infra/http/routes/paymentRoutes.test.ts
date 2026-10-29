@@ -134,6 +134,7 @@ describe('authentication edge cases', () => {
     ['token whose payload is a plain string', jwt.sign('just-a-string', SECRET)],
     ['token signed with another secret', jwt.sign({ userId: 'u', role: 'ADMIN' }, 'other-secret')],
     ['expired token', jwt.sign({ userId: 'u', role: 'ADMIN' }, SECRET, { expiresIn: -10 })],
+    ['token signed with another HMAC algorithm (HS384)', jwt.sign({ userId: 'u', role: 'ADMIN' }, SECRET, { algorithm: 'HS384' })],
   ])('rejects a %s', async (_label, signed) => {
     const res = await process_({ orderId: 'o', userId: 'u', amount: 1 }, `Bearer ${signed}`);
     expect(res.statusCode).toBe(401);
@@ -172,6 +173,9 @@ describe('input boundaries (schema)', () => {
     ['failureReason at 250 chars', { ...ok, simulateOutcome: 'FAILED', failureReason: 'r'.repeat(250) }, 200],
     ['failureReason at 251 chars', { ...ok, failureReason: 'r'.repeat(251) }, 400],
     ['empty userId', { ...ok, userId: '' }, 400],
+    ['userId at 120 chars', { ...ok, userId: 'u'.repeat(120) }, 200],
+    ['userId at 121 chars', { ...ok, userId: 'u'.repeat(121) }, 400],
+    ['APPROVED simulation below the limit', { ...ok, simulateOutcome: 'APPROVED' }, 200],
     ['messageId at 121 chars', { ...ok, messageId: 'm'.repeat(121) }, 400],
   ])('%s → %i', async (_label, body, status) => {
     expect((await process_(body, ADMIN)).statusCode).toBe(status);

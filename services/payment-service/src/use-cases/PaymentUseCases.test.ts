@@ -6,6 +6,7 @@ import {
 } from '../domain/errors/PaymentErrors.js';
 import { InMemoryPaymentRepository } from '../test-support/InMemoryPaymentRepository.js';
 import {
+  ANTI_FRAUD_LIMIT,
   GetPaymentByOrderIdUseCase,
   ProcessPaymentUseCase,
 } from './PaymentUseCases.js';
@@ -95,8 +96,8 @@ describe('Payment Service Use Cases & Saga Compensation', () => {
   // Tabela de decisão da regra antifraude: (simulação, valor) → resultado
   it.each([
     ['sem simulação, abaixo do limite → APPROVED', undefined, 100, 'APPROVED'],
-    ['sem simulação, no limite exato → APPROVED', undefined, 50000, 'APPROVED'],
-    ['sem simulação, 1 centavo acima → FAILED', undefined, 50000.01, 'FAILED'],
+    ['sem simulação, no limite exato → APPROVED', undefined, ANTI_FRAUD_LIMIT, 'APPROVED'],
+    ['sem simulação, 1 centavo acima → FAILED', undefined, ANTI_FRAUD_LIMIT + 0.01, 'FAILED'],
     ['simulação FAILED, valor baixo → FAILED', 'FAILED', 100, 'FAILED'],
     ['simulação APPROVED, valor baixo → APPROVED', 'APPROVED', 100, 'APPROVED'],
     ['simulação APPROVED acima do limite → FAILED (não fura o antifraude)', 'APPROVED', 60000, 'FAILED'],

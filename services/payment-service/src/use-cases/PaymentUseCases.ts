@@ -5,6 +5,9 @@ import {
   type ProcessPaymentResult,
 } from '../domain/repositories/IPaymentRepository.js';
 
+/** Acima deste valor o pagamento é recusado pela regra antifraude (o valor exato é aprovado). */
+export const ANTI_FRAUD_LIMIT = 50_000;
+
 export interface ProcessPaymentInput {
   orderId: string;
   userId?: string;
@@ -20,9 +23,9 @@ export class ProcessPaymentUseCase {
   async execute(input: ProcessPaymentInput): Promise<ProcessPaymentResult> {
     assertValidPayment(input);
 
-    // Antifraude: acima de 50.000 sempre recusa. A simulação só pode FORÇAR uma recusa
-    // (demonstração da compensação); nunca aprova o que a regra recusaria.
-    const shouldFail = input.simulateOutcome === 'FAILED' || input.amount > 50000;
+    // A simulação só pode FORÇAR uma recusa (demonstração da compensação);
+    // nunca aprova o que a regra antifraude recusaria.
+    const shouldFail = input.simulateOutcome === 'FAILED' || input.amount > ANTI_FRAUD_LIMIT;
 
     const status = shouldFail ? 'FAILED' : 'APPROVED';
     const reason = shouldFail
