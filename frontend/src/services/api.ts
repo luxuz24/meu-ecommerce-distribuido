@@ -117,7 +117,7 @@ async function requestWithTelemetry<T>(
 export const userApi = {
   checkHealth: () =>
     requestWithTelemetry<{ status: string; service: string }>(
-      'user-service:3000',
+      'user-service',
       USER_API_URL,
       'GET',
       '/health/user'
@@ -128,13 +128,13 @@ export const userApi = {
     email: string;
     password: string;
   }) =>
-    requestWithTelemetry<User>('user-service:3000', USER_API_URL, 'POST', '/users', {
+    requestWithTelemetry<User>('user-service', USER_API_URL, 'POST', '/users', {
       body: payload,
     }),
 
   login: (payload: { email: string; password: string }) =>
     requestWithTelemetry<LoginResponse>(
-      'user-service:3000',
+      'user-service',
       USER_API_URL,
       'POST',
       '/login',
@@ -142,7 +142,7 @@ export const userApi = {
     ),
 
   getMe: (token: string) =>
-    requestWithTelemetry<User>('user-service:3000', USER_API_URL, 'GET', '/users/me', {
+    requestWithTelemetry<User>('user-service', USER_API_URL, 'GET', '/users/me', {
       token,
     }),
 };
@@ -150,7 +150,7 @@ export const userApi = {
 export const catalogApi = {
   checkHealth: () =>
     requestWithTelemetry<{ status: string; service: string }>(
-      'catalog-service:3001',
+      'catalog-service',
       CATALOG_API_URL,
       'GET',
       '/health/catalog'
@@ -172,7 +172,7 @@ export const catalogApi = {
     const path = `/api/products${queryString ? `?${queryString}` : ''}`;
 
     return requestWithTelemetry<PaginatedProducts>(
-      'catalog-service:3001',
+      'catalog-service',
       CATALOG_API_URL,
       'GET',
       path
@@ -181,7 +181,7 @@ export const catalogApi = {
 
   getProductById: (id: string) =>
     requestWithTelemetry<Product>(
-      'catalog-service:3001',
+      'catalog-service',
       CATALOG_API_URL,
       'GET',
       `/api/products/${id}`
@@ -189,7 +189,7 @@ export const catalogApi = {
 
   createProduct: (payload: CreateProductInput, token?: string | null) =>
     requestWithTelemetry<Product>(
-      'catalog-service:3001',
+      'catalog-service',
       CATALOG_API_URL,
       'POST',
       '/api/products',
@@ -209,7 +209,7 @@ export const catalogApi = {
     token?: string | null
   ) =>
     requestWithTelemetry<Product>(
-      'catalog-service:3001',
+      'catalog-service',
       CATALOG_API_URL,
       'PATCH',
       `/api/products/${id}`,
@@ -225,7 +225,7 @@ export const catalogApi = {
 
   deleteProduct: (id: string, token?: string | null) =>
     requestWithTelemetry<null>(
-      'catalog-service:3001',
+      'catalog-service',
       CATALOG_API_URL,
       'DELETE',
       `/api/products/${id}`,
@@ -242,15 +242,23 @@ export const catalogApi = {
 export const inventoryApi = {
   checkHealth: () =>
     requestWithTelemetry<{ status: string; service: string }>(
-      'inventory-service:3003',
+      'inventory-service',
       INVENTORY_API_URL,
       'GET',
       '/health/inventory'
     ),
 
+  listAll: () =>
+    requestWithTelemetry<{ items: InventoryItemRecord[] }>(
+      'inventory-service',
+      INVENTORY_API_URL,
+      'GET',
+      '/api/inventory'
+    ),
+
   getBySku: (sku: string) =>
     requestWithTelemetry<InventoryItemRecord>(
-      'inventory-service:3003',
+      'inventory-service',
       INVENTORY_API_URL,
       'GET',
       `/api/inventory/${encodeURIComponent(sku)}`
@@ -261,7 +269,7 @@ export const inventoryApi = {
     token?: string | null
   ) =>
     requestWithTelemetry<InventoryItemRecord>(
-      'inventory-service:3003',
+      'inventory-service',
       INVENTORY_API_URL,
       'POST',
       '/api/inventory/seed',
@@ -280,7 +288,7 @@ export const inventoryApi = {
     items: Array<{ sku: string; quantity: number }>;
   }) =>
     requestWithTelemetry<ReserveStockResponse>(
-      'inventory-service:3003',
+      'inventory-service',
       INVENTORY_API_URL,
       'POST',
       '/api/inventory/reserve',
@@ -291,7 +299,7 @@ export const inventoryApi = {
 export const orderApi = {
   checkHealth: () =>
     requestWithTelemetry<{ status: string; service: string }>(
-      'order-service:3004',
+      'order-service',
       ORDER_API_URL,
       'GET',
       '/health/order'
@@ -308,7 +316,7 @@ export const orderApi = {
     token?: string | null
   ) =>
     requestWithTelemetry<Order>(
-      'order-service:3004',
+      'order-service',
       ORDER_API_URL,
       'POST',
       '/api/orders',
@@ -324,7 +332,7 @@ export const orderApi = {
 
   listMyOrders: (token?: string | null) =>
     requestWithTelemetry<{ items: Order[]; total: number }>(
-      'order-service:3004',
+      'order-service',
       ORDER_API_URL,
       'GET',
       '/api/orders',
@@ -339,7 +347,7 @@ export const orderApi = {
 
   getOrderById: (id: string, token?: string | null) =>
     requestWithTelemetry<Order>(
-      'order-service:3004',
+      'order-service',
       ORDER_API_URL,
       'GET',
       `/api/orders/${id}`,
@@ -365,7 +373,7 @@ export const orderApi = {
     token?: string | null
   ) =>
     requestWithTelemetry<Order>(
-      'order-service:3004',
+      'order-service',
       ORDER_API_URL,
       'PATCH',
       `/api/orders/${id}/saga-event`,
@@ -383,7 +391,7 @@ export const orderApi = {
 export const paymentApi = {
   checkHealth: () =>
     requestWithTelemetry<{ status: string; service: string }>(
-      'payment-service:3005',
+      'payment-service',
       PAYMENT_API_URL,
       'GET',
       '/health/payment'
@@ -391,7 +399,7 @@ export const paymentApi = {
 
   getByOrderId: (orderId: string) =>
     requestWithTelemetry<PaymentRecord>(
-      'payment-service:3005',
+      'payment-service',
       PAYMENT_API_URL,
       'GET',
       `/api/payments/${encodeURIComponent(orderId)}`
@@ -405,7 +413,7 @@ export const paymentApi = {
     failureReason?: string;
   }) =>
     requestWithTelemetry<ProcessPaymentResponse>(
-      'payment-service:3005',
+      'payment-service',
       PAYMENT_API_URL,
       'POST',
       '/api/payments/process',

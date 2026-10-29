@@ -131,7 +131,7 @@ export const OrdersPage: React.FC = () => {
       } else {
         setFeedback({
           type: 'error',
-          message: 'Não foi possível conectar ao order-service (:3004).',
+          message: 'Não foi possível conectar à API (gateway :8080 → order-service).',
         });
       }
     } finally {
@@ -147,7 +147,7 @@ export const OrdersPage: React.FC = () => {
           <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
             <span className="inline-flex items-center gap-1.5 bg-secondary-container text-on-secondary-container font-code-sm text-code-sm px-2.5 py-0.5 rounded-lg">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-              order-service :3004 · Saga Coreografada (Outbox + RabbitMQ)
+              order-service via gateway :8080 · Saga Coreografada (Outbox + RabbitMQ)
             </span>
             {telemetry && (
               <span className="font-code-sm text-code-sm text-tertiary">

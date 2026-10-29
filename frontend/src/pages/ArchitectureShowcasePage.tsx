@@ -241,8 +241,11 @@ export const ArchitectureShowcasePage: React.FC = () => {
                     <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">
                       {srv.name}
                     </h3>
-                    <span className="font-code-sm text-code-sm bg-surface-container-lowest px-2 py-0.5 rounded shadow-sm border border-surface-container">
-                      :{srv.port}
+                    <span
+                      className="font-code-sm text-code-sm bg-surface-container-lowest px-2 py-0.5 rounded shadow-sm border border-surface-container"
+                      title="Porta interna da rede do Compose. O navegador acessa todos os serviços pelo gateway :8080."
+                    >
+                      interna :{srv.port}
                     </span>
                   </div>
 

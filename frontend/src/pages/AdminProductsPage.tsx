@@ -223,7 +223,7 @@ export const AdminProductsPage: React.FC = () => {
             <div className="inline-flex items-center gap-1.5 bg-surface-container-lowest px-2.5 py-1 rounded-lg shadow-sm whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-ping" />
               <span className="font-code-sm text-code-sm text-on-surface">
-                catalog-service :3001
+                catalog-service · gateway :8080
               </span>
               {telemetry && (
                 <span className="font-code-sm text-code-sm text-tertiary font-semibold">

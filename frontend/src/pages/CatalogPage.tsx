@@ -14,6 +14,7 @@ import type {
 } from '../domain/types';
 import { ApiError, catalogApi, inventoryApi, userApi } from '../services/api';
 import { DEMO_ADMIN } from '../config/demoAccounts';
+import { withLiveStock } from '../domain/stock';
 
 const DEMO_SEED_PRODUCTS: CreateProductInput[] = [
   {
@@ -98,15 +99,21 @@ export const CatalogPage: React.FC = () => {
         params.active = true;
       }
 
-      const res = await catalogApi.listProducts(params);
-      setData(res.data);
+      const [res, stock] = await Promise.all([
+        catalogApi.listProducts(params),
+        // Saldo real (inventory); se falhar, a vitrine segue com o valor do catálogo
+        inventoryApi.listAll().catch(() => null),
+      ]);
+      setData(
+        stock ? { ...res.data, items: withLiveStock(res.data.items, stock.data.items) } : res.data
+      );
       setTelemetry(res.telemetry);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
         setTelemetry(err.telemetry);
       } else {
-        setError('Não foi possível conectar ao catalog-service (:3001).');
+        setError('Não foi possível conectar à API (gateway :8080 → catalog-service).');
       }
     } finally {
       setLoading(false);
@@ -165,7 +172,7 @@ export const CatalogPage: React.FC = () => {
           <div className="flex items-center justify-between mb-space-xs">
             <span className="inline-flex items-center gap-1.5 bg-secondary-container text-on-secondary-container font-code-sm text-code-sm px-2 py-0.5 rounded-lg">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-              catalog-service :3001
+              catalog-service · gateway :8080
             </span>
             {telemetry && (
               <span className="font-code-sm text-code-sm text-tertiary flex items-center gap-1 bg-surface-container-low px-2 py-0.5 rounded-lg">
